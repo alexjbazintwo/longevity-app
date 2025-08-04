@@ -153,25 +153,51 @@ export default function LongevityForm() {
       });
       return;
     }
+
     setFormErrors({});
     setLoading(true);
-    const res = await fetch("http://localhost:3000/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    });
-    const data = await res.json();
-    setResult(data.result);
-    setLoading(false);
-    setTimeout(
-      () =>
+
+    const structuredData = {
+      sex: formData.sex,
+      dob: formData.dob,
+      country: formData.country,
+      weight: Number(formData.weight),
+      height: Number(formData.height),
+      dietQuality: formData.dietQuality,
+      exercise: String(formData.exercise || "").trim(),
+      smoking: formData.smoking,
+      alcohol: formData.alcohol,
+      sleepQuality: formData.sleepQuality,
+      stressLevel: formData.stressLevel,
+      medicalConditions: String(formData.medicalConditions || "").trim(),
+      socialConnection: formData.socialConnection,
+      incomeBracket: formData.incomeBracket,
+      educationLevel: formData.educationLevel,
+      willingnessToChange: formData.willingnessToChange,
+    };
+
+    try {
+      const res = await fetch("http://localhost:3000/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(structuredData),
+      });
+
+      const data = await res.json();
+      setResult(data.result);
+      setTimeout(() => {
         stepsRef.current[questions.length + 1]?.scrollIntoView({
           behavior: "smooth",
           block: "center",
-        }),
-      300
-    );
+        });
+      }, 300);
+    } catch (err) {
+      console.error("Submission failed", err);
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const renderField = (q: (typeof questions)[number]) => {
     const value = formData[q.name] || "";
