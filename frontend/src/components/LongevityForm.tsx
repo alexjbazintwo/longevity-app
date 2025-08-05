@@ -1,104 +1,34 @@
-import { useRef, useState, useEffect } from "react";
-import { getNames } from "country-list";
-
-const preferredCountry = "United Kingdom";
-const allCountries = getNames()
-  .filter((c: string) => c !== preferredCountry)
-  .sort();
-const countryOptions = [preferredCountry, ...allCountries];
-
-const aboutYou = [
-  {
-    name: "sex",
-    label: "Sex:",
-    type: "imageChoice",
-    options: ["male", "female"],
-  },
-  { name: "dob", label: "Date of Birth:", type: "date" },
-  {
-    name: "country",
-    label: "Which country do you live in?",
-    type: "select",
-    options: countryOptions,
-  },
-];
-
-const healthBehaviour = [
-  { name: "weight", label: "What is your weight (kg)?", type: "number" },
-  { name: "height", label: "What is your height (cm)?", type: "number" },
-  {
-    name: "dietQuality",
-    label: "How would you rate your diet?",
-    type: "select",
-    options: ["very healthy", "healthy", "average", "poor"],
-  },
-  { name: "exercise", label: "How often do you exercise?", type: "text" },
-  {
-    name: "smoking",
-    label: "Do you smoke?",
-    type: "select",
-    options: ["no", "occasionally", "regularly"],
-  },
-  {
-    name: "alcohol",
-    label: "How often do you drink alcohol?",
-    type: "select",
-    options: ["none", "moderate", "heavy"],
-  },
-  {
-    name: "sleepQuality",
-    label: "How would you rate your sleep quality?",
-    type: "select",
-    options: ["excellent", "good", "fair", "poor"],
-  },
-  {
-    name: "stressLevel",
-    label: "What is your stress level?",
-    type: "select",
-    options: ["low", "moderate", "high"],
-  },
-  {
-    name: "medicalConditions",
-    label: "Any medical conditions?",
-    type: "textarea",
-  },
-  {
-    name: "socialConnection",
-    label: "How strong are your social connections?",
-    type: "select",
-    options: ["strong", "average", "poor"],
-  },
-  {
-    name: "incomeBracket",
-    label: "What is your income bracket?",
-    type: "select",
-    options: ["low", "middle", "high"],
-  },
-  {
-    name: "educationLevel",
-    label: "Your highest education level?",
-    type: "select",
-    options: ["none", "high school", "bachelor", "master", "phd"],
-  },
-  {
-    name: "willingnessToChange",
-    label: "How willing are you to change your habits?",
-    type: "select",
-    options: ["low", "moderate", "high"],
-  },
-];
-
-const questions = [...aboutYou, ...healthBehaviour];
-type FormData = Record<string, string | number>;
+import { useEffect } from "react";
+import { useState } from "react";
+import { aboutYou, healthBehaviour, questions } from "../data/questions";
+import type { FormData } from "../types";
+import { useSubmitForm } from "../hooks/useSubmitForm";
+import { validateForm } from "../hooks/useFormValidation";
+import { useScrollNavigation } from "../hooks/useScrollNavigation";
+import type { LongevityResult } from "../types/longevityResult";
+import LongevityChart from "./longevityChart";
 
 export default function LongevityForm() {
-  const [formData, setFormData] = useState<FormData>({});
-  const [currentVisibleIndex, setCurrentVisibleIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Partial<FormData>>(() => {
+    try {
+      const stored = localStorage.getItem("longevityFormData");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [visibleIndexes, setVisibleIndexes] = useState<number[]>([]);
-  const stepsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<LongevityResult | null>(null);
+
+  const { submit } = useSubmitForm();
+  const { stepsRef, currentVisibleIndex, visibleIndexes, scrollToStep } =
+    useScrollNavigation();
+
+  useEffect(() => {
+    localStorage.setItem("longevityFormData", JSON.stringify(formData));
+  }, [formData]);
 
   const getProgress = (subset: typeof questions) => {
     const total = subset.length;
@@ -106,98 +36,33 @@ export default function LongevityForm() {
     return Math.round((answered / total) * 100);
   };
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .map((entry) => Number((entry.target as HTMLElement).dataset.index))
-          .sort((a, b) => a - b);
-        if (visible.length > 0) setCurrentVisibleIndex(visible[0]);
-        setVisibleIndexes(visible);
-      },
-      { threshold: 0.6 }
-    );
-
-    stepsRef.current.forEach((el) => el && observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-
-  const handleNext = () => {
-    const next = stepsRef.current[currentVisibleIndex + 1];
-    if (!next) return;
-    next.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => {
-      const input = next.querySelector(
-        "input, select, textarea"
-      ) as HTMLElement;
-      input?.focus();
-    }, 600);
-  };
+  const handleNext = () => scrollToStep(currentVisibleIndex + 1);
 
   const handleChange = (name: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async () => {
-    const newErrors: Record<string, string> = {};
-    questions.forEach((q) => {
-      if (!formData[q.name]) newErrors[q.name] = "This field is required.";
-    });
-    if (Object.keys(newErrors).length > 0) {
-      setFormErrors(newErrors);
-      const firstErrorIndex = questions.findIndex((q) => newErrors[q.name]);
-      stepsRef.current[firstErrorIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+    const errors = validateForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      const firstErrorIndex = questions.findIndex((q) => errors[q.name]);
+      scrollToStep(firstErrorIndex);
       return;
     }
 
     setFormErrors({});
     setLoading(true);
-
-    const structuredData = {
-      sex: formData.sex,
-      dob: formData.dob,
-      country: formData.country,
-      weight: Number(formData.weight),
-      height: Number(formData.height),
-      dietQuality: formData.dietQuality,
-      exercise: String(formData.exercise || "").trim(),
-      smoking: formData.smoking,
-      alcohol: formData.alcohol,
-      sleepQuality: formData.sleepQuality,
-      stressLevel: formData.stressLevel,
-      medicalConditions: String(formData.medicalConditions || "").trim(),
-      socialConnection: formData.socialConnection,
-      incomeBracket: formData.incomeBracket,
-      educationLevel: formData.educationLevel,
-      willingnessToChange: formData.willingnessToChange,
-    };
-
     try {
-      const res = await fetch("http://localhost:3000/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(structuredData),
-      });
-
-      const data = await res.json();
-      setResult(data.result);
-      setTimeout(() => {
-        stepsRef.current[questions.length + 1]?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }, 300);
+      const result = await submit(formData as FormData);
+      setResult(result);
+      scrollToStep(questions.length + 1);
     } catch (err) {
       console.error("Submission failed", err);
     } finally {
       setLoading(false);
     }
   };
-
 
   const renderField = (q: (typeof questions)[number]) => {
     const value = formData[q.name] || "";
@@ -322,7 +187,7 @@ export default function LongevityForm() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-10 md:px-20 relative z-10">
-      <div className="flex gap-4 px-4 sm:px-10 md:px-20 sticky top-[88px] z-40 bg-white py-4">
+      <div className="flex gap-4 sticky top-[88px] z-40 bg-white py-4">
         <div className="flex-1">
           <p className="text-sm text-gray-600 mb-1">About You</p>
           <div className="h-2 bg-gray-200 rounded">
@@ -377,15 +242,98 @@ export default function LongevityForm() {
         </button>
       </div>
 
-      {result && (
+      {result && formData.dob && (
         <div
           ref={(el) => void (stepsRef.current[questions.length + 1] = el)}
           className="bg-green-50 p-6 rounded mt-10 shadow text-gray-800"
         >
-          <h3 className="text-xl font-semibold mb-2">
-            Your Life Expectancy Estimate
+          <h3 className="text-2xl font-semibold mb-6">
+            Your Longevity Insights
           </h3>
-          <p className="whitespace-pre-wrap">{result}</p>
+
+          <div className="space-y-4">
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">
+                Comparison
+              </h4>
+              <p className="text-gray-800">{result.comparison}</p>
+            </section>
+
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">Advice</h4>
+              <p className="text-gray-800 whitespace-pre-line">
+                {result.advice}
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">
+                Chance of reaching 100
+              </h4>
+              <p className="text-gray-800">
+                {result.percentageChanceOfReaching100}%
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">
+                Your predicted life expectancy
+              </h4>
+              <p className="text-gray-800">
+                {result.predictedLifeExpectancy} years
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">
+                Healthy until age
+              </h4>
+              <p className="text-gray-800">
+                {result.predictedLastHealthyAge} years
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-lg font-medium text-gray-700 mb-1">
+                Country average life expectancy
+              </h4>
+              <p className="text-gray-800">
+                {result.averageLifeExpectancyInCountry} years
+              </p>
+            </section>
+          </div>
+
+          {(() => {
+            const rawDob = formData.dob;
+            const dobDate = rawDob ? new Date(rawDob) : null;
+            const age =
+              dobDate && !isNaN(dobDate.getTime())
+                ? new Date().getFullYear() - dobDate.getFullYear()
+                : null;
+
+                console.log("DOB:", rawDob);
+                console.log("Parsed DOB:", dobDate);
+                console.log("Age:", age);
+
+            return (
+              age !== null && (
+                <div className="overflow-x-auto mt-10">
+                  <div className="min-w-[300px] max-w-full">
+                    <LongevityChart
+                      currentAge={age}
+                      predictedLifeExpectancy={result.predictedLifeExpectancy}
+                      averageLifeExpectancyInCountry={
+                        result.averageLifeExpectancyInCountry
+                      }
+                      percentageChanceOfReaching100={
+                        result.percentageChanceOfReaching100
+                      }
+                    />
+                  </div>
+                </div>
+              )
+            );
+          })()}
         </div>
       )}
     </main>

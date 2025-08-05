@@ -1,5 +1,5 @@
 // src/pages/LifeExpectancy.tsx
-import LongevityForm from "../components/LongevityForm";
+import LongevityForm from "../components/longevityForm";
 
 export default function LifeExpectancy() {
   return (
