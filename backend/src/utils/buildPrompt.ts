@@ -25,15 +25,28 @@ Estimate someone's longevity using the following input:
 - Education Level: ${data.educationLevel}
 - Willingness to Change: ${data.willingnessToChange}
 
-Return the result as **pure JSON**:
+Return the result as **pure JSON** with the following fields:
+
 {
-  "predictedLifeExpectancy": 85,
-  "predictedLastHealthyAge": 74,
-  "averageLifeExpectancyInCountry": 80,
-  "percentageChanceOfReaching100": 22,
-  "comparison": "Your estimated life expectancy is above average for a male in the UK.",
-  "advice": "Keep up your healthy habits and consider more regular exercise."
+  "predictedLifeExpectancy": number,
+  "predictedLastHealthyAge": number,
+  "averageLifeExpectancyInCountry": number,
+  "percentageChanceOfReaching100": number,
+  "comparison": string,
+  "advice": string,
+
+  "fitnessDecline": {
+    "estimatedPeakMuscleMass": number, // in kg or % of body weight
+    "estimatedPeakStrength": number,   // in kg or relative scale
+    "estimatedPeakVo2Max": number,     // in ml/kg/min
+
+    "muscleMassDecline": { [age: number]: number }, // % of peak from current age to 100
+    "strengthDecline": { [age: number]: number },   // % of peak from current age to 100
+    "vo2MaxDecline": { [age: number]: number }      // % of peak from current age to 100
+  }
 }
+
+Assume the user performs **no regular exercise** from now until age 100.
 
 No markdown. No commentary. Just clean JSON.
 `.trim();

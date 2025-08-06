@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useState } from "react";
 import { aboutYou, healthBehaviour, questions } from "../data/questions";
-import type { FormData } from "../types";
+import type { FormData } from "../types/longevityForm";
 import { useSubmitForm } from "../hooks/useSubmitForm";
 import { validateForm } from "../hooks/useFormValidation";
 import { useScrollNavigation } from "../hooks/useScrollNavigation";
@@ -311,9 +311,9 @@ export default function LongevityForm() {
                 ? new Date().getFullYear() - dobDate.getFullYear()
                 : null;
 
-                console.log("DOB:", rawDob);
-                console.log("Parsed DOB:", dobDate);
-                console.log("Age:", age);
+            console.log("DOB:", rawDob);
+            console.log("Parsed DOB:", dobDate);
+            console.log("Age:", age);
 
             return (
               age !== null && (
@@ -328,6 +328,7 @@ export default function LongevityForm() {
                       percentageChanceOfReaching100={
                         result.percentageChanceOfReaching100
                       }
+                      predictedLastHealthyAge={result.predictedLastHealthyAge}
                     />
                   </div>
                 </div>

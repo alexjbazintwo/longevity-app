@@ -1,3 +1,12 @@
+export interface FitnessDeclineData {
+  muscleMassDecline: Record<number, number>; // % of peak at each age
+  strengthDecline: Record<number, number>;
+  vo2MaxDecline: Record<number, number>;
+  estimatedPeakMuscleMass: number;
+  estimatedPeakStrength: number;
+  estimatedPeakVo2Max: number;
+}
+
 export interface LongevityResult {
   predictedLifeExpectancy: number;
   predictedLastHealthyAge: number;
@@ -5,4 +14,6 @@ export interface LongevityResult {
   percentageChanceOfReaching100: number;
   comparison: string;
   advice: string;
+
+  fitnessDecline: FitnessDeclineData; // ✅ NEW
 }

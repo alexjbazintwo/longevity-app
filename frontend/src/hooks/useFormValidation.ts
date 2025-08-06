@@ -1,4 +1,4 @@
-import type { FormData } from "../types";
+import type { FormData } from "../types/longevityForm";
 import { questions } from "../data/questions";
 
 export const validateForm = (formData: Partial<FormData>) => {

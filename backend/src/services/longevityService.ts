@@ -36,9 +36,16 @@ export async function estimateLongevity(
 
   try {
     const parsed = JSON.parse(content.trim());
+
+    // ✅ Validate presence of fitnessDecline
+    if (!parsed.fitnessDecline) {
+      throw new Error("Missing fitnessDecline in AI response");
+    }
+
     return parsed as LongevityResult;
   } catch (err) {
     console.error("Failed to parse OpenAI response:", content);
     throw new Error("Malformed AI response");
   }
 }
+

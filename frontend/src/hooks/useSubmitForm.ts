@@ -1,4 +1,4 @@
-import type { FormData } from "../types";
+import type { FormData } from "../types/longevityForm";
 import type { LongevityResult } from "../types/longevityResult";
 
 export const useSubmitForm = () => {
