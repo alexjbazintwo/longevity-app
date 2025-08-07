@@ -1,6 +1,6 @@
 import express from "express";
 import { estimateLongevity } from "../services/longevityService";
-import { LongevityFormData } from "../types/formData";
+import { LongevityFormData } from "../types/longevityForm";
 
 const router = express.Router();
 

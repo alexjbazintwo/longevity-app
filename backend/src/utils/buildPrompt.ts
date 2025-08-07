@@ -1,4 +1,4 @@
-import { LongevityFormData } from "../types/formData";
+import { LongevityFormData } from "../types/longevityForm";
 
 export function buildLongevityPrompt(data: LongevityFormData): string {
   const birthYear = new Date(data.dob).getFullYear();
@@ -6,7 +6,9 @@ export function buildLongevityPrompt(data: LongevityFormData): string {
   const age = currentYear - birthYear;
 
   return `
-Estimate someone's longevity using the following input:
+You are a health and longevity expert.
+
+Estimate the following person's current and potential future health and life expectancy based on their lifestyle and demographics:
 
 - Age: ${age}
 - Gender: ${data.sex}
@@ -25,29 +27,54 @@ Estimate someone's longevity using the following input:
 - Education Level: ${data.educationLevel}
 - Willingness to Change: ${data.willingnessToChange}
 
-Return the result as **pure JSON** with the following fields:
+Return ONLY a raw JSON object with the following exact structure:
 
 {
-  "predictedLifeExpectancy": number,
-  "predictedLastHealthyAge": number,
-  "averageLifeExpectancyInCountry": number,
-  "percentageChanceOfReaching100": number,
-  "comparison": string,
-  "advice": string,
-
-  "fitnessDecline": {
-    "estimatedPeakMuscleMass": number, // in kg or % of body weight
-    "estimatedPeakStrength": number,   // in kg or relative scale
-    "estimatedPeakVo2Max": number,     // in ml/kg/min
-
-    "muscleMassDecline": { [age: number]: number }, // % of peak from current age to 100
-    "strengthDecline": { [age: number]: number },   // % of peak from current age to 100
-    "vo2MaxDecline": { [age: number]: number }      // % of peak from current age to 100
+  "current": {
+    "longevity": {
+      "predictedLifeExpectancy": number,
+      "predictedLastHealthyAge": number,
+      "averageLifeExpectancyInCountry": number,
+      "percentageChanceOfReaching100": number,
+      "comparison": string,
+      "advice": string,
+      "survivalTrajectory": [
+        { "age": number, "chance": number }
+      ]
+    },
+    "fitness": {
+      "vo2Max": {
+        "currentValue": number,
+        "trajectory": [
+          { "age": number, "value": number }
+        ]
+      },
+      "strength": {
+        "currentPercent": number,
+        "trajectory": [
+          { "age": number, "value": number }
+        ]
+      }
+    }
+  },
+  "potential": {
+    "longevity": {
+      "potentialLifeExpectancy": number,
+      "potentialLastHealthyAge": number,
+      "potentialPercentageChanceOfReaching100": number,
+      "potentialHealthyYearsGained": number,
+      "potentialSurvivalTrajectory": [
+        { "age": number, "chance": number }
+      ]
+    }
   }
 }
 
-Assume the user performs **no regular exercise** from now until age 100.
-
-No markdown. No commentary. Just clean JSON.
+Constraints:
+- Return 8–12 total points in each trajectory array (survival, vo2Max, strength), with denser values after age 60.
+- Use realistic, non-linear declines over time.
+- Use whole numbers only (no decimals).
+- Do not return any extra text, explanation, formatting, or markdown.
+- Ensure the JSON is valid and directly parsable.
 `.trim();
 }

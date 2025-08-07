@@ -1,51 +1,20 @@
-import dotenv from "dotenv";
-dotenv.config();
-import OpenAI from "openai";
-import { LongevityFormData } from "../types/formData";
-import { LongevityResult } from "../types/longevityResult";
+import { LongevityFormData } from "../types/longevityForm";
 import { buildLongevityPrompt } from "../utils/buildPrompt";
-import { mockedLongevityResult } from "../mocks/longevityMock";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { callOpenAI } from "../utils/openai";
+import { HealthPredictionResult } from "../types/longevityResult";
+import { mockedHealthPredictionResult } from "../mocks/longevityMock";
 
 export async function estimateLongevity(
   form: LongevityFormData
-): Promise<LongevityResult> {
-  if (process.env.MOCK_OPENAI === "true") {
-    console.log("🔁 Using mocked OpenAI response");
-    return mockedLongevityResult;
+): Promise<HealthPredictionResult> {
+  const useMock = process.env.MOCK_OPENAI === "true";
+
+  if (useMock) {
+    return mockedHealthPredictionResult;
   }
 
   const prompt = buildLongevityPrompt(form);
+  const aiResponse = await callOpenAI(prompt);
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a longevity expert. Return only clean JSON with no markdown or explanations.",
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.7,
-  });
-
-  const content = completion.choices[0].message?.content;
-  if (!content) throw new Error("Empty response from OpenAI");
-
-  try {
-    const parsed = JSON.parse(content.trim());
-
-    // ✅ Validate presence of fitnessDecline
-    if (!parsed.fitnessDecline) {
-      throw new Error("Missing fitnessDecline in AI response");
-    }
-
-    return parsed as LongevityResult;
-  } catch (err) {
-    console.error("Failed to parse OpenAI response:", content);
-    throw new Error("Malformed AI response");
-  }
+  return aiResponse;
 }
-

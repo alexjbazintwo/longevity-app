@@ -1,4 +1,3 @@
-// src/components/ResultDisplay.tsx
 type Props = {
   result: string | null;
 };

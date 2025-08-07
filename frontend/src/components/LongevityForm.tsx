@@ -1,12 +1,11 @@
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { aboutYou, healthBehaviour, questions } from "../data/questions";
 import type { FormData } from "../types/longevityForm";
 import { useSubmitForm } from "../hooks/useSubmitForm";
 import { validateForm } from "../hooks/useFormValidation";
 import { useScrollNavigation } from "../hooks/useScrollNavigation";
-import type { LongevityResult } from "../types/longevityResult";
-import LongevityChart from "./longevityChart";
+import { useResultContext } from "../context/resultContext";
 
 export default function LongevityForm() {
   const [formData, setFormData] = useState<Partial<FormData>>(() => {
@@ -20,9 +19,10 @@ export default function LongevityForm() {
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LongevityResult | null>(null);
 
   const { submit } = useSubmitForm();
+  const { setResult } = useResultContext();
+  const navigate = useNavigate();
   const { stepsRef, currentVisibleIndex, visibleIndexes, scrollToStep } =
     useScrollNavigation();
 
@@ -54,9 +54,9 @@ export default function LongevityForm() {
     setFormErrors({});
     setLoading(true);
     try {
-      const result = await submit(formData as FormData);
-      setResult(result);
-      scrollToStep(questions.length + 1);
+      const response = await submit(formData as FormData);
+      setResult({ ...response, dob: formData.dob! }); // save full result + dob
+      navigate("/life-expectancy-result");
     } catch (err) {
       console.error("Submission failed", err);
     } finally {
@@ -241,102 +241,6 @@ export default function LongevityForm() {
           {loading ? "Calculating..." : "Estimate Longevity"}
         </button>
       </div>
-
-      {result && formData.dob && (
-        <div
-          ref={(el) => void (stepsRef.current[questions.length + 1] = el)}
-          className="bg-green-50 p-6 rounded mt-10 shadow text-gray-800"
-        >
-          <h3 className="text-2xl font-semibold mb-6">
-            Your Longevity Insights
-          </h3>
-
-          <div className="space-y-4">
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">
-                Comparison
-              </h4>
-              <p className="text-gray-800">{result.comparison}</p>
-            </section>
-
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">Advice</h4>
-              <p className="text-gray-800 whitespace-pre-line">
-                {result.advice}
-              </p>
-            </section>
-
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">
-                Chance of reaching 100
-              </h4>
-              <p className="text-gray-800">
-                {result.percentageChanceOfReaching100}%
-              </p>
-            </section>
-
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">
-                Your predicted life expectancy
-              </h4>
-              <p className="text-gray-800">
-                {result.predictedLifeExpectancy} years
-              </p>
-            </section>
-
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">
-                Healthy until age
-              </h4>
-              <p className="text-gray-800">
-                {result.predictedLastHealthyAge} years
-              </p>
-            </section>
-
-            <section>
-              <h4 className="text-lg font-medium text-gray-700 mb-1">
-                Country average life expectancy
-              </h4>
-              <p className="text-gray-800">
-                {result.averageLifeExpectancyInCountry} years
-              </p>
-            </section>
-          </div>
-
-          {(() => {
-            const rawDob = formData.dob;
-            const dobDate = rawDob ? new Date(rawDob) : null;
-            const age =
-              dobDate && !isNaN(dobDate.getTime())
-                ? new Date().getFullYear() - dobDate.getFullYear()
-                : null;
-
-            console.log("DOB:", rawDob);
-            console.log("Parsed DOB:", dobDate);
-            console.log("Age:", age);
-
-            return (
-              age !== null && (
-                <div className="overflow-x-auto mt-10">
-                  <div className="min-w-[300px] max-w-full">
-                    <LongevityChart
-                      currentAge={age}
-                      predictedLifeExpectancy={result.predictedLifeExpectancy}
-                      averageLifeExpectancyInCountry={
-                        result.averageLifeExpectancyInCountry
-                      }
-                      percentageChanceOfReaching100={
-                        result.percentageChanceOfReaching100
-                      }
-                      predictedLastHealthyAge={result.predictedLastHealthyAge}
-                    />
-                  </div>
-                </div>
-              )
-            );
-          })()}
-        </div>
-      )}
     </main>
   );
 }
