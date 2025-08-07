@@ -58,7 +58,7 @@ export const mockedHealthPredictionResult: HealthPredictionResult = {
         { age: 60, chance: 92 },
         { age: 70, chance: 83 },
         { age: 80, chance: 70 },
-        { age: 90, chance: 45 },
+        { age: 90, chance: 50 },
         { age: 100, chance: 35 },
       ],
     },

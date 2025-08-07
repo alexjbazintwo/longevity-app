@@ -10,22 +10,15 @@ import {
 import type { LongevitySurvivalPoint } from "../types/longevityResult";
 
 interface LongevityChartProps {
-  currentAge: number;
-  predictedLifeExpectancy: number;
-  potentialLifeExpectancy: number;
-  currentChanceAt100: number;
-  potentialChanceAt100: number;
   currentSurvivalTrajectory: LongevitySurvivalPoint[];
   potentialSurvivalTrajectory: LongevitySurvivalPoint[];
 }
 
 export default function LifeExpectancyChart({
-  predictedLifeExpectancy,
-  potentialLifeExpectancy,
   currentSurvivalTrajectory,
   potentialSurvivalTrajectory,
 }: LongevityChartProps) {
-  const mergedTrajectory: {
+  const data: {
     age: number;
     current?: number;
     potential?: number;
@@ -41,25 +34,18 @@ export default function LifeExpectancyChart({
     .forEach((age) => {
       const current = currentSurvivalTrajectory.find((p) => p.age === age);
       const potential = potentialSurvivalTrajectory.find((p) => p.age === age);
-      mergedTrajectory.push({
+      data.push({
         age,
         current: current?.chance,
         potential: potential?.chance,
       });
     });
 
-  const referencePoints = [
-    {
-      x: Math.min(predictedLifeExpectancy, 100),
-      color: "#3b82f6",
-      label: "Your Life Expectancy",
-    },
-    {
-      x: Math.min(potentialLifeExpectancy, 100),
-      color: "#22c55e",
-      label: "Potential Life Expectancy",
-    },
-  ];
+  const findAgeAt50 = (trajectory: LongevitySurvivalPoint[]) =>
+    trajectory.find((point) => point.chance === 50)?.age ?? null;
+
+  const currentLEAge = findAgeAt50(currentSurvivalTrajectory);
+  const potentialLEAge = findAgeAt50(potentialSurvivalTrajectory);
 
   return (
     <div className="my-16 max-w-6xl mx-auto px-6 font-figtree">
@@ -69,7 +55,7 @@ export default function LifeExpectancyChart({
 
       <div className="rounded-[2rem] bg-white/50 shadow-2xl backdrop-blur-lg border border-gray-200 p-6 sm:p-12 relative overflow-hidden transition-all">
         <ResponsiveContainer width="100%" height={420}>
-          <AreaChart data={mergedTrajectory}>
+          <AreaChart data={data}>
             <XAxis
               dataKey="age"
               stroke="#9ca3af"
@@ -107,7 +93,7 @@ export default function LifeExpectancyChart({
               stroke="#3b82f6"
               strokeWidth={3}
               dot={false}
-              name="Current Trajectory"
+              name="Current Life Expectancy Trajectory"
             />
             <Line
               type="monotone"
@@ -116,30 +102,53 @@ export default function LifeExpectancyChart({
               strokeWidth={3}
               strokeDasharray="6 3"
               dot={false}
-              name="Potential Trajectory"
+              name="Potential Life Expectancy Trajectory"
             />
 
-            {referencePoints.map(({ x, color }, i) => (
+            {currentLEAge && (
               <ReferenceLine
-                key={`line-${i}`}
-                x={x}
-                stroke={color}
+                x={currentLEAge}
+                stroke="#3b82f6"
                 strokeDasharray="4 2"
                 strokeWidth={2}
                 ifOverflow="extendDomain"
               />
-            ))}
+            )}
+            {potentialLEAge && (
+              <ReferenceLine
+                x={potentialLEAge}
+                stroke="#22c55e"
+                strokeDasharray="4 2"
+                strokeWidth={2}
+                ifOverflow="extendDomain"
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm text-gray-700 text-center">
+        {/* Updated Legend */}
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 text-sm text-gray-700 text-center">
           <div className="flex items-center justify-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#3b82f6]" />
-            <span>Current Life Expectancy</span>
+            <span className="w-4 h-1.5 rounded-full bg-[#3b82f6]" />
+            <span>Current Life Expectancy Trajectory</span>
           </div>
           <div className="flex items-center justify-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
-            <span>Potential Life Expectancy</span>
+            <span className="w-4 h-1.5 rounded-full bg-[#22c55e]" />
+            <span>Potential Life Expectancy Trajectory</span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <span
+              className="w-4 h-0.5 border-t-2 border-dashed"
+              style={{ borderColor: "#3b82f6" }}
+            />
+            <span>Estimated Life Expectancy</span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <span
+              className="w-4 h-0.5 border-t-2 border-dashed"
+              style={{ borderColor: "#22c55e" }}
+            />
+            <span>Estimated Potential Life Expectancy</span>
           </div>
         </div>
       </div>
