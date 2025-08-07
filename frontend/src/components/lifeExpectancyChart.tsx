@@ -10,6 +10,11 @@ import {
 import type { LongevitySurvivalPoint } from "../types/longevityResult";
 
 interface LongevityChartProps {
+  currentAge: number;
+  predictedLifeExpectancy: number;
+  potentialLifeExpectancy: number;
+  currentChanceAt100: number;
+  potentialChanceAt100: number;
   currentSurvivalTrajectory: LongevitySurvivalPoint[];
   potentialSurvivalTrajectory: LongevitySurvivalPoint[];
 }
@@ -48,10 +53,14 @@ export default function LifeExpectancyChart({
   const potentialLEAge = findAgeAt50(potentialSurvivalTrajectory);
 
   return (
-    <div className="my-16 max-w-6xl mx-auto px-6 font-figtree">
-      <h3 className="text-4xl sm:text-5xl font-bold text-center text-gray-800 mb-10 tracking-tight">
-        Your Longevity Journey
+    <div className="mt-16 max-w-6xl mx-auto px-6 font-figtree">
+      <h3 className="text-3xl sm:text-4xl font-bold text-center text-gray-800 mb-4 tracking-tight">
+        Life Expectancy Chart
       </h3>
+      <p className="text-center text-gray-600 text-sm mb-10 max-w-2xl mx-auto">
+        Comparison of current life expectancy and potential life expectancy with
+        improved lifestyle
+      </p>
 
       <div className="rounded-[2rem] bg-white/50 shadow-2xl backdrop-blur-lg border border-gray-200 p-6 sm:p-12 relative overflow-hidden transition-all">
         <ResponsiveContainer width="100%" height={420}>
@@ -93,6 +102,7 @@ export default function LifeExpectancyChart({
               stroke="#3b82f6"
               strokeWidth={3}
               dot={false}
+              connectNulls={true}
               name="Current Life Expectancy Trajectory"
             />
             <Line
@@ -102,6 +112,7 @@ export default function LifeExpectancyChart({
               strokeWidth={3}
               strokeDasharray="6 3"
               dot={false}
+              connectNulls={true}
               name="Potential Life Expectancy Trajectory"
             />
 
@@ -126,7 +137,6 @@ export default function LifeExpectancyChart({
           </AreaChart>
         </ResponsiveContainer>
 
-        {/* Updated Legend */}
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4 text-sm text-gray-700 text-center">
           <div className="flex items-center justify-center gap-2">
             <span className="w-4 h-1.5 rounded-full bg-[#3b82f6]" />

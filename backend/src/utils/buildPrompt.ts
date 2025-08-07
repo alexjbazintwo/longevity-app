@@ -72,7 +72,11 @@ Return ONLY a raw JSON object with the following exact structure:
 
 Constraints:
 - Return 8–12 total points in each trajectory array (survival, vo2Max, strength), with denser values after age 60.
-- Use realistic, non-linear declines over time.
+- Use realistic, smooth, **non-linear declines** over time.
+- Avoid sudden drops in chance between two ages — all survival trajectories should resemble **sigmoid or exponential decay curves**, with gradual decline at first, steeper around life expectancy, and tapering off after.
+- Ensure **no single drop exceeds 15%** in any 5-year span unless it's post-life expectancy.
+- Each survivalTrajectory and potentialSurvivalTrajectory must include a point where chance is exactly 50 (representing life expectancy).
+- All trajectories must include an endpoint at age 100 with chance/value 1 or less.
 - Use whole numbers only (no decimals).
 - Do not return any extra text, explanation, formatting, or markdown.
 - Ensure the JSON is valid and directly parsable.

@@ -25,7 +25,11 @@ export default function LongevityInsights({
   const currentAge = getCurrentAge();
 
   return (
-    <section className="mt-10">
+    <main className="mt-16 max-w-6xl mx-auto px-6 font-figtree">
+      <h1 className="text-4xl sm:text-5xl font-bold text-center text-gray-800 mb-4 tracking-tight">
+        Your Longevity Journey
+      </h1>
+
       <LifeExpectancyChart
         currentAge={currentAge}
         predictedLifeExpectancy={
@@ -45,6 +49,6 @@ export default function LongevityInsights({
           result.potential.longevity.potentialSurvivalTrajectory
         }
       />
-    </section>
+    </main>
   );
 }
