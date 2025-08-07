@@ -7,11 +7,9 @@ export default function LongevityResult() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading delay, or remove if not needed
     const timeout = setTimeout(() => {
       setLoading(false);
     }, 500);
-
     return () => clearTimeout(timeout);
   }, []);
 
@@ -40,7 +38,7 @@ export default function LongevityResult() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-10 md:px-20 py-10">
-      <LongevityInsights result={result.current.longevity} dob={result.dob} />
+      <LongevityInsights result={result} dob={result.dob} />
     </main>
   );
 }
