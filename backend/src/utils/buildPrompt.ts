@@ -8,24 +8,41 @@ export function buildLongevityPrompt(data: LongevityFormData): string {
   return `
 You are a health and longevity expert.
 
-Estimate the following person's current and potential future health and life expectancy based on their lifestyle and demographics:
+Estimate the following person's current and potential future health and life expectancy based on their lifestyle, health history, and demographics:
 
+Demographics:
 - Age: ${age}
-- Gender: ${data.sex}
+- Sex: ${data.sex}
 - Country: ${data.country}
 - Weight: ${data.weight} kg
 - Height: ${data.height} cm
-- Diet Quality: ${data.dietQuality}
-- Exercise: ${data.exercise}
-- Smoking: ${data.smoking}
-- Alcohol: ${data.alcohol}
-- Sleep Quality: ${data.sleepQuality}
-- Stress Level: ${data.stressLevel}
-- Medical Conditions: ${data.medicalConditions}
-- Social Connection: ${data.socialConnection}
-- Income Bracket: ${data.incomeBracket}
-- Education Level: ${data.educationLevel}
-- Willingness to Change: ${data.willingnessToChange}
+- Waist circumference: ${data.waistCircumference} cm
+
+Lifestyle & Activity:
+- Strength training hours/week: ${data.strengthTrainingHours}
+- Light activity hours/week: ${data.lightAerobicHours}
+- Intense aerobic hours/week: ${data.intenseAerobicHours}
+- Average steps/day: ${data.averageStepsPerDay}
+- Push-up capacity: ${data.pushupCapacity}
+- Fruit & veg servings/day: ${data.fruitVegIntake}
+- Processed food intake: ${data.processedFoodIntake}
+- Alcohol units/week: ${data.alcoholUnitsPerWeek}
+- Smoking status: ${data.smoking}
+
+Health & History:
+- Medical conditions: ${data.medicalConditions.join(", ") || "None"}
+- Family history: ${data.familyHistory.join(", ") || "None"}
+- Sleep duration (hours/night): ${data.sleepHours}
+- Sleep quality: ${data.sleepQuality}
+- Stress level: ${data.stressLevel}
+
+Social & Mindset:
+- Social connection strength: ${data.socialConnection}
+- Loneliness frequency: ${data.lonelinessFrequency}
+- Income bracket: ${data.incomeBracket}
+- Education level: ${data.educationLevel}
+- Job type: ${data.jobType}
+- Willingness to change: ${data.willingnessToChange}
 
 Return ONLY a raw JSON object with the following exact structure:
 

@@ -5,7 +5,8 @@ import { HealthPredictionResult } from "../types/longevityResult";
 import { mockedHealthPredictionResult } from "../mocks/longevityMock";
 
 export async function estimateLongevity(
-  form: LongevityFormData
+  form: LongevityFormData,
+  seed: string // new second param
 ): Promise<HealthPredictionResult> {
   const useMock = process.env.MOCK_OPENAI === "true";
 
@@ -14,7 +15,11 @@ export async function estimateLongevity(
   }
 
   const prompt = buildLongevityPrompt(form);
-  const aiResponse = await callOpenAI(prompt);
+
+  const aiResponse = await callOpenAI(prompt, {
+    seed: parseInt(seed.slice(0, 8), 16),
+    temperature: 0,
+  });
 
   return aiResponse;
 }

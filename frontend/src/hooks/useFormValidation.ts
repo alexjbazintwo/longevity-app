@@ -1,12 +1,24 @@
-import type { FormData } from "../types/longevityForm";
-import { questions } from "../data/questions";
+import type { FormData, Question } from "../types/longevityForm";
+export function validateForm(
+  formData: Partial<FormData>,
+  subset?: Question[]
+): Record<keyof FormData, string> {
+  const errors: Partial<Record<keyof FormData, string>> = {};
 
-export const validateForm = (formData: Partial<FormData>) => {
-  const errors: Record<string, string> = {};
-  questions.forEach((q) => {
-    if (!formData[q.name]) {
+  const questionsToCheck = subset ?? ([] as Question[]);
+
+  for (const q of questionsToCheck) {
+    const value = formData[q.name];
+
+    const isMissing =
+      value === undefined ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0);
+
+    if (isMissing) {
       errors[q.name] = "This field is required.";
     }
-  });
-  return errors;
-};
+  }
+
+  return errors as Record<keyof FormData, string>;
+}
