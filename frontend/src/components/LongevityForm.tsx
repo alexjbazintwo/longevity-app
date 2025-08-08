@@ -32,9 +32,7 @@ export default function LongevityForm() {
 
   const currentSection = questionSections[currentSectionIndex];
   const isLastSection = currentSectionIndex === questionSections.length - 1;
-  const isFirstSection = currentSectionIndex === 0;
 
-  // Base bright colors for the progress bars (Tailwind CSS colors)
   const brightColors = [
     "rgb(37 99 235)", // blue-600
     "rgb(22 163 74)", // green-600
@@ -42,7 +40,6 @@ export default function LongevityForm() {
     "rgb(249 115 22)", // orange-500 (closest bright orange)
   ];
 
-  // Generate the subtle background color with alpha (~15% opacity)
   const hoverBgColors = brightColors.map(
     (rgb) => `rgba(${rgb.match(/\d+/g)?.join(", ")}, 0.15)`
   );
@@ -51,7 +48,6 @@ export default function LongevityForm() {
     localStorage.setItem("longevityFormData", JSON.stringify(formData));
   }, [formData]);
 
-  // Scroll to first question of new section when section changes
   useEffect(() => {
     if (currentSection.questions.length > 0) {
       const firstQuestionName = currentSection.questions[0].name;
@@ -60,7 +56,7 @@ export default function LongevityForm() {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-  }, [currentSectionIndex]);
+  }, [currentSectionIndex, currentSection.questions]);
 
   useEffect(() => {
     if (nextFieldToScrollTo && fieldRefs.current[nextFieldToScrollTo]) {
@@ -79,33 +75,6 @@ export default function LongevityForm() {
     const total = subset.length;
     const answered = subset.filter((q) => formData[q.name]).length;
     return Math.round((answered / total) * 100);
-  };
-
-  const handleNext = () => {
-    const sectionQuestions = currentSection.questions;
-    const errors = validateForm(formData, sectionQuestions);
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-
-      const firstInvalidKey = sectionQuestions.find(
-        (q) => errors[q.name]
-      )?.name;
-      if (firstInvalidKey) {
-        setNextFieldToScrollTo(firstInvalidKey);
-      }
-
-      return;
-    }
-
-    setFormErrors({});
-    setCurrentSectionIndex((prev) =>
-      Math.min(prev + 1, questionSections.length - 1)
-    );
-  };
-
-  const handleBack = () => {
-    setCurrentSectionIndex((prev) => Math.max(prev - 1, 0));
   };
 
   const handleChange = (
@@ -255,33 +224,44 @@ export default function LongevityForm() {
     }
 
     if (q.type === "multiSelect" && q.options) {
+      const selectedValues = (formData[q.name] as string[]) || [];
       return (
         <>
-          <label
-            htmlFor={q.name}
-            id={`${q.name}-label`}
-            className="block font-light text-3xl leading-[35px] text-[#515151] mb-4"
-          >
-            {q.label}
-          </label>
-          <select
-            {...sharedProps}
-            multiple
-            value={formData[q.name] || []}
-            onChange={(e) =>
-              handleChange(
-                q.name,
-                Array.from(e.target.selectedOptions).map((o) => o.value),
-                q.type
-              )
-            }
-          >
-            {q.options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+          <fieldset aria-labelledby={`${q.name}-label`} className="mb-4">
+            <legend
+              id={`${q.name}-label`}
+              className="block font-light text-3xl leading-[35px] text-[#515151] mb-4"
+            >
+              {q.label}
+            </legend>
+            <div className="flex flex-col gap-2 max-w-md">
+              {q.options.map((opt) => (
+                <label
+                  key={opt}
+                  className="inline-flex items-center cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    name={q.name}
+                    value={opt}
+                    checked={selectedValues.includes(opt)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      let newValues = [...selectedValues];
+                      if (checked) {
+                        if (!newValues.includes(opt)) newValues.push(opt);
+                      } else {
+                        newValues = newValues.filter((v) => v !== opt);
+                      }
+                      handleChange(q.name, newValues, q.type);
+                    }}
+                    className="mr-3 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-lg text-gray-700">{opt}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </>
       );
     }
@@ -306,28 +286,44 @@ export default function LongevityForm() {
     );
   };
 
+  const showBack = currentSectionIndex > 0;
+  const showNext = !isLastSection;
+
+  let justifyContentClass = "justify-between";
+  if (showBack && !showNext) justifyContentClass = "justify-start";
+  if (!showBack && showNext) justifyContentClass = "justify-end";
+
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-10 md:px-20 relative z-10">
       {/* Progress Bars Container */}
-      <div className="flex flex-wrap gap-4 sticky top-[88px] z-40 bg-white py-4">
+      <div className="flex flex-wrap gap-4 sticky top-[88px] z-40 bg-white py-4 px-3">
         {questionSections.map(({ label, questions }, i) => (
           <div
             key={label}
-            className="flex-1 min-w-[150px] rounded-md transition-colors px-3 py-2"
+            role="button"
+            tabIndex={0}
+            onClick={() => scrollToSection(i)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                scrollToSection(i);
+              }
+            }}
+            className="min-w-[150px] rounded-md transition-colors px-3 py-2 cursor-pointer select-none outline-none"
             style={{
               backgroundColor:
                 currentSectionIndex === i ? hoverBgColors[i] : undefined,
               color:
                 currentSectionIndex === i
                   ? brightColors[i]
-                  : "rgba(100, 116, 139, 1)" /* Tailwind gray-500 */,
+                  : "rgba(100, 116, 139, 1)",
             }}
+            aria-label={`Go to ${label} section`}
           >
-            {/* Wrap label and progress bar in a flex column with fixed label height */}
             <div className="flex flex-col">
               <p
-                className="text-sm mb-1 flex items-center justify-center font-semibold select-none"
-                style={{ minHeight: 36 }} // fix height to reserve space for 2 lines max
+                className="text-sm mb-1 flex items-center justify-center font-semibold text-center"
+                style={{ minHeight: 36 }}
               >
                 {label}
               </p>
@@ -369,9 +365,9 @@ export default function LongevityForm() {
         ))}
       </div>
 
-      {/* Bottom navigation: show previous and/or next section names */}
-      <div ref={buttonsRef} className="flex justify-between items-center mt-8">
-        {!isFirstSection && (
+      {/* Bottom navigation with dynamic justify-content */}
+      <div className={`flex items-center mt-8 ${justifyContentClass}`}>
+        {showBack && (
           <button
             type="button"
             onClick={() => scrollToSection(currentSectionIndex - 1)}
@@ -379,22 +375,6 @@ export default function LongevityForm() {
             style={{
               backgroundColor: hoverBgColors[currentSectionIndex - 1],
               color: brightColors[currentSectionIndex - 1],
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex - 1];
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex - 1];
-            }}
-            onFocus={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex - 1];
-            }}
-            onBlur={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex - 1];
             }}
             aria-label={`Go to ${
               questionSections[currentSectionIndex - 1].label
@@ -404,7 +384,7 @@ export default function LongevityForm() {
           </button>
         )}
 
-        {!isLastSection && (
+        {showNext && (
           <button
             type="button"
             onClick={() => scrollToSection(currentSectionIndex + 1)}
@@ -413,27 +393,27 @@ export default function LongevityForm() {
               backgroundColor: hoverBgColors[currentSectionIndex + 1],
               color: brightColors[currentSectionIndex + 1],
             }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex + 1];
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex + 1];
-            }}
-            onFocus={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex + 1];
-            }}
-            onBlur={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor =
-                hoverBgColors[currentSectionIndex + 1];
-            }}
             aria-label={`Go to ${
               questionSections[currentSectionIndex + 1].label
             } section`}
           >
             {questionSections[currentSectionIndex + 1].label} →
+          </button>
+        )}
+
+        {isLastSection && (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className={`cursor-pointer rounded-md px-4 py-2 font-semibold transition-colors ${
+              loading
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
+            aria-label="Submit form"
+          >
+            {loading ? "Submitting…" : "Submit"}
           </button>
         )}
       </div>
