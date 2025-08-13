@@ -75,7 +75,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="dark min-h-screen bg-background text-foreground">
       {/* Top Banner / Navigation */}
       <header className="relative z-50">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 sm:px-8">
@@ -129,7 +129,7 @@ export default function Home() {
                 <Separator className="my-6 bg-white/10" />
                 <div className="space-y-3">
                   <Button className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 text-black hover:opacity-90">
-                    See Your Current Longevity
+                    Start your free trial
                   </Button>
                   <Button
                     className="w-full rounded-xl border-white/15 bg-white/5 text-white hover:bg-white/10"
@@ -194,7 +194,7 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button className="group rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 text-black shadow-lg shadow-emerald-500/20 hover:opacity-90">
-              See Your Current Longevity
+              Start your free trial
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Button>
             <Button
