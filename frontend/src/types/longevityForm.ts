@@ -34,24 +34,28 @@ export interface FormData {
   willingnessToChange: "low" | "moderate" | "high";
 }
 
-export type Question =
-  | {
-      name: keyof FormData;
-      label: string;
-      type: "number" | "date" | "text";
-    }
-  | {
-      name: keyof FormData;
-      label: string;
-      type: "select" | "imageChoice";
-      options: string[];
-    }
-  | {
-      name: keyof FormData;
-      label: string;
-      type: "multiSelect";
-      options: string[];
-    };
+type BaseQuestion = {
+  name: keyof FormData;
+  label: string;
+  /** If omitted, treated as required */
+  required?: boolean;
+};
+
+type InputQuestion = BaseQuestion & {
+  type: "number" | "date" | "text";
+};
+
+type SelectQuestion = BaseQuestion & {
+  type: "select" | "imageChoice";
+  options: Readonly<string[]>;
+};
+
+type MultiSelectQuestion = BaseQuestion & {
+  type: "multiSelect";
+  options: Readonly<string[]>;
+};
+
+export type Question = InputQuestion | SelectQuestion | MultiSelectQuestion;
 
 export interface QuestionSection {
   id: string;
