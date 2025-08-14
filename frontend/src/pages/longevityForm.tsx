@@ -77,28 +77,26 @@ export default function LongevityFormPage() {
   const isLast = currentSectionIndex === sections.length - 1;
   const isFirst = currentSectionIndex === 0;
 
-  // Per-section completion (for progress chips)
-const sectionProgress = useMemo(() => {
-  return sections.map((s) => {
-    const total = s.questions.length;
-    const answered = s.questions.filter((q) => {
-      const key = q.name as keyof LongevityFormData;
-      const v = formData[key] as unknown;
-
-      if (v === undefined || v === null) return false;
-      if (typeof v === "string") return v.trim() !== "";
-      if (Array.isArray(v)) return v.length > 0;
-      return true;
-    }).length;
-
-    return {
-      label: s.label,
-      total,
-      answered,
-      pct: total ? Math.round((answered / total) * 100) : 0,
-    };
-  });
-}, [sections, formData]);
+  // Per-section completion (for progress chips) — inline the answer check so deps are just [sections, formData]
+  const sectionProgress = useMemo(() => {
+    return sections.map((s) => {
+      const total = s.questions.length;
+      const answered = s.questions.filter((q) => {
+        const key = q.name as keyof LongevityFormData;
+        const v = formData[key] as unknown;
+        if (v === undefined || v === null) return false;
+        if (typeof v === "string") return v.trim() !== "";
+        if (Array.isArray(v)) return v.length > 0;
+        return true;
+      }).length;
+      return {
+        label: s.label,
+        total,
+        answered,
+        pct: total ? Math.round((answered / total) * 100) : 0,
+      };
+    });
+  }, [sections, formData]);
 
   function resetForm() {
     localStorage.removeItem("longevityFormData");
@@ -120,6 +118,7 @@ const sectionProgress = useMemo(() => {
       const apiResult = await submit(formData as LongevityFormData);
       const dob = (formData as LongevityFormData).dob;
 
+      // Merge dob with API payload; infer types from submit and setResult
       type ApiResult = Awaited<ReturnType<typeof submit>>;
       type SetResultArg = Parameters<typeof setResult>[0];
       const payload = {
@@ -478,8 +477,7 @@ function renderQuestion(
     }
 
     default: {
-      // Exhaustive check: if the union is complete, we never get here.
-      const _exhaustive: never = q.type as never;
+      // If a new type is added to Question['type'], update renderer.
       return null;
     }
   }
