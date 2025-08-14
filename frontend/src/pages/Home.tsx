@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Menu,
@@ -202,6 +203,13 @@ export default function Home() {
               className="rounded-xl border-white/20 bg-white/10 px-6 text-white backdrop-blur hover:bg-white/15"
             >
               See how it works
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="rounded-xl border-white/20 bg-white/10 px-6 text-white backdrop-blur hover:bg-white/15"
+            >
+              <Link to="/life-expectancy-form">Check your longevity</Link>
             </Button>
           </div>
 
