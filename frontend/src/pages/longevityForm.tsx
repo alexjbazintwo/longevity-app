@@ -100,7 +100,7 @@ export default function LongevityFormPage() {
   const [loading, setLoading] = useState(false);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
-  // Typed helpers (avoid `any`)
+  // Typed helpers
   function setField<K extends keyof LongevityFormData>(
     key: K,
     value: LongevityFormData[K] | undefined
@@ -127,7 +127,7 @@ export default function LongevityFormPage() {
   const isLast = currentSectionIndex === sections.length - 1;
   const isFirst = currentSectionIndex === 0;
 
-  // Per-section completion (for progress chips) — inline the answer check so deps are just [sections, formData]
+  // Progress chips (answers counted regardless of required-ness)
   const sectionProgress = useMemo(() => {
     return sections.map((s) => {
       const total = s.questions.length;
@@ -273,6 +273,10 @@ export default function LongevityFormPage() {
                 Answer a few evidence-based questions across four areas. You can
                 pause anytime—your progress saves automatically.
               </p>
+              {/* Legend for required fields */}
+              <div className="mt-2 text-xs text-slate-500">
+                <span className="text-red-600">*</span> required
+              </div>
             </div>
             <div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex">
               <ShieldCheck className="h-4 w-4" /> Your data stays private
@@ -321,7 +325,7 @@ export default function LongevityFormPage() {
         <div className="grid gap-4">
           {currentSection.questions.map((q: Question, idx: number) => {
             const key = String(q.name);
-            const showRequired = isQuestionRequired(q);
+            const required = isQuestionRequired(q);
             const hasError = Boolean(formErrors[key]);
 
             return (
@@ -332,20 +336,25 @@ export default function LongevityFormPage() {
                 }`}
               >
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <label
                       htmlFor={key}
                       className="block text-sm font-medium text-slate-800"
                     >
                       {readLabel(q) || key}
+                      {required && (
+                        <>
+                          <span aria-hidden className="ml-0.5 text-red-600">
+                            *
+                          </span>
+                          <span className="sr-only"> (required)</span>
+                        </>
+                      )}
                     </label>
-                    {showRequired && (
-                      <span className="text-xs text-red-600">Required</span>
-                    )}
                   </div>
 
                   <div className="mt-2">
-                    {renderQuestion(q, getField, setField, hasError)}
+                    {renderQuestion(q, getField, setField, hasError, required)}
                   </div>
 
                   {hasError && (
@@ -430,7 +439,8 @@ function renderQuestion(
     key: K,
     value: LongevityFormData[K] | undefined
   ) => void,
-  hasError: boolean
+  hasError: boolean,
+  required: boolean
 ) {
   const common =
     "w-full rounded-xl border px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2";
@@ -455,6 +465,8 @@ function renderQuestion(
           onChange={(e) =>
             setField(key, e.target.value as LongevityFormData[typeof key])
           }
+          required={required}
+          aria-required={required || undefined}
         />
       );
     }
@@ -477,6 +489,8 @@ function renderQuestion(
                 : Number(e.target.value)) as LongevityFormData[typeof key]
             )
           }
+          required={required}
+          aria-required={required || undefined}
         />
       );
     }
@@ -495,6 +509,8 @@ function renderQuestion(
             setField(key, e.target.value as LongevityFormData[typeof key])
           }
           placeholder={placeholder}
+          required={required}
+          aria-required={required || undefined}
         />
       );
     }
@@ -511,6 +527,8 @@ function renderQuestion(
           onChange={(e) =>
             setField(key, e.target.value as LongevityFormData[typeof key])
           }
+          required={required}
+          aria-required={required || undefined}
         >
           <option value="" disabled>
             Select an option
@@ -540,7 +558,12 @@ function renderQuestion(
       }
 
       return (
-        <div className="flex flex-wrap gap-2">
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-labelledby={`${String(q.name)}-label`}
+          aria-required={required || undefined}
+        >
           {opts.map((opt) => {
             const active = current.includes(opt);
             return (
@@ -555,6 +578,7 @@ function renderQuestion(
                     ? "border-red-300 bg-red-50 text-slate-800"
                     : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
+                aria-pressed={active}
               >
                 {opt}
               </button>
@@ -570,7 +594,12 @@ function renderQuestion(
       const opts = ((q as unknown as Optioned).options ?? []).map(String);
       const value = (getField(key) as string | undefined) ?? "";
       return (
-        <div className="flex flex-wrap gap-3">
+        <div
+          className="flex flex-wrap gap-3"
+          role="radiogroup"
+          aria-labelledby={`${String(q.name)}-label`}
+          aria-required={required || undefined}
+        >
           {opts.map((opt) => {
             const active = value === opt;
             return (
@@ -587,6 +616,8 @@ function renderQuestion(
                     ? "border-red-300 bg-red-50 text-slate-800"
                     : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
+                role="radio"
+                aria-checked={active}
               >
                 {opt}
               </button>
