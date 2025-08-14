@@ -35,6 +35,51 @@ function readPlaceholder(q: unknown, fallback = "Type here"): string {
   return fallback;
 }
 
+/** Get label safely without `any`. */
+function readLabel(q: Question): string {
+  if (typeof q === "object" && q !== null && "label" in q) {
+    const v = (q as Record<string, unknown>).label;
+    return typeof v === "string" ? v : "";
+  }
+  return "";
+}
+
+/** Heuristic: mark key longevity predictors as required without touching your data file. */
+function isQuestionRequired(q: Question): boolean {
+  const nameStr = String(q.name);
+  const labelStr = readLabel(q).toLowerCase();
+  const lowerName = nameStr.toLowerCase();
+
+  const needles = [
+    "dob",
+    "date of birth",
+    "age",
+    "gender",
+    "sex",
+    "height",
+    "weight",
+    "bmi",
+    "smok", // smoking / smoker
+    "alcohol",
+    "drink",
+    "exercise",
+    "activity",
+    "workout",
+    "sleep",
+    "hours of sleep",
+  ];
+
+  return needles.some((n) => lowerName.includes(n) || labelStr.includes(n));
+}
+
+/** Filled check for different input types. */
+function isFilled(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.length > 0;
+  return true; // numbers/booleans/objects considered filled
+}
+
 export default function LongevityFormPage() {
   const navigate = useNavigate();
   const { setResult } = useResultContext();
@@ -61,6 +106,11 @@ export default function LongevityFormPage() {
     value: LongevityFormData[K] | undefined
   ) {
     setFormData((prev) => ({ ...prev, [key]: value }));
+    setFormErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[String(key)]; // clear error as the user types/selects
+      return copy;
+    });
   }
   function getField<K extends keyof LongevityFormData>(
     key: K
@@ -83,7 +133,7 @@ export default function LongevityFormPage() {
       const total = s.questions.length;
       const answered = s.questions.filter((q) => {
         const key = q.name as keyof LongevityFormData;
-        const v = formData[key] as unknown;
+        const v = (formData as Partial<LongevityFormData>)[key] as unknown;
         if (v === undefined || v === null) return false;
         if (typeof v === "string") return v.trim() !== "";
         if (Array.isArray(v)) return v.length > 0;
@@ -105,13 +155,63 @@ export default function LongevityFormPage() {
     setCurrentSectionIndex(0);
   }
 
+  /** Validate the current section's *required* questions. */
+  function validateCurrentSection(): boolean {
+    const errs: Record<string, string> = {};
+    for (const q of currentSection.questions) {
+      if (!isQuestionRequired(q)) continue;
+      const key = String(q.name);
+      const fieldKey = q.name as keyof LongevityFormData;
+      const value = (formData as Partial<LongevityFormData>)[fieldKey];
+      if (!isFilled(value)) {
+        errs[key] = "This field is required.";
+      }
+    }
+    setFormErrors((prev) => ({ ...prev, ...errs }));
+
+    if (Object.keys(errs).length > 0) {
+      // Scroll to first error
+      const first = Object.keys(errs)[0];
+      const el = document.getElementById(first);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+
+  /** Validate *all sections* required questions before submit (plus your existing business rules). */
+  function validateAllRequired(): Record<string, string> {
+    const errs: Record<string, string> = {};
+    for (const s of sections) {
+      for (const q of s.questions) {
+        if (!isQuestionRequired(q)) continue;
+        const key = String(q.name);
+        const fieldKey = q.name as keyof LongevityFormData;
+        const value = (formData as Partial<LongevityFormData>)[fieldKey];
+        if (!isFilled(value)) {
+          errs[key] = "This field is required.";
+        }
+      }
+    }
+    return errs;
+  }
+
   async function onSubmit() {
     try {
       setLoading(true);
 
-      const errors = validateForm(formData as LongevityFormData);
-      setFormErrors(errors);
-      if (Object.keys(errors).length > 0) {
+      // Required-first validation across all sections
+      const requiredErrors = validateAllRequired();
+      // Your existing validator (kept as-is, merged in)
+      const domainErrors = validateForm(formData as LongevityFormData) || {};
+      const combined = { ...requiredErrors, ...domainErrors };
+
+      setFormErrors(combined);
+      if (Object.keys(combined).length > 0) {
+        // Scroll to first error
+        const first = Object.keys(combined)[0];
+        const el = document.getElementById(first);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
 
@@ -221,24 +321,34 @@ export default function LongevityFormPage() {
         <div className="grid gap-4">
           {currentSection.questions.map((q: Question, idx: number) => {
             const key = String(q.name);
+            const showRequired = isQuestionRequired(q);
+            const hasError = Boolean(formErrors[key]);
+
             return (
               <Card
                 key={`${key}-${idx}`}
-                className="rounded-2xl border-slate-200"
+                className={`rounded-2xl ${
+                  hasError ? "border-red-300" : "border-slate-200"
+                }`}
               >
                 <CardContent className="p-5">
-                  <label
-                    htmlFor={key}
-                    className="block text-sm font-medium text-slate-800"
-                  >
-                    {q.label}
-                  </label>
-
-                  <div className="mt-2">
-                    {renderQuestion(q, getField, setField)}
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor={key}
+                      className="block text-sm font-medium text-slate-800"
+                    >
+                      {readLabel(q) || key}
+                    </label>
+                    {showRequired && (
+                      <span className="text-xs text-red-600">Required</span>
+                    )}
                   </div>
 
-                  {formErrors[key] && (
+                  <div className="mt-2">
+                    {renderQuestion(q, getField, setField, hasError)}
+                  </div>
+
+                  {hasError && (
                     <div className="mt-2 text-sm text-red-600">
                       {formErrors[key]}
                     </div>
@@ -269,11 +379,14 @@ export default function LongevityFormPage() {
             {!isLast ? (
               <Button
                 className="rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 text-black hover:opacity-90"
-                onClick={() =>
-                  setCurrentSectionIndex((i) =>
-                    Math.min(sections.length - 1, i + 1)
-                  )
-                }
+                onClick={() => {
+                  // Gate next on required questions in this section
+                  if (validateCurrentSection()) {
+                    setCurrentSectionIndex((i) =>
+                      Math.min(sections.length - 1, i + 1)
+                    );
+                  }
+                }}
               >
                 Next section <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -316,10 +429,16 @@ function renderQuestion(
   setField: <K extends keyof LongevityFormData>(
     key: K,
     value: LongevityFormData[K] | undefined
-  ) => void
+  ) => void,
+  hasError: boolean
 ) {
   const common =
-    "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-200";
+    "w-full rounded-xl border px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2";
+  const base = `${common} ${
+    hasError
+      ? "border-red-300 bg-red-50 focus:ring-red-200"
+      : "border-slate-200 bg-white text-slate-900 focus:ring-emerald-200"
+  }`;
 
   type Optioned = { options?: readonly (string | number)[] };
 
@@ -331,7 +450,7 @@ function renderQuestion(
         <input
           id={String(q.name)}
           type="date"
-          className={common}
+          className={base}
           value={value}
           onChange={(e) =>
             setField(key, e.target.value as LongevityFormData[typeof key])
@@ -348,7 +467,7 @@ function renderQuestion(
         <input
           id={String(q.name)}
           type="number"
-          className={common}
+          className={base}
           value={display}
           onChange={(e) =>
             setField(
@@ -370,7 +489,7 @@ function renderQuestion(
         <input
           id={String(q.name)}
           type="text"
-          className={common}
+          className={base}
           value={value}
           onChange={(e) =>
             setField(key, e.target.value as LongevityFormData[typeof key])
@@ -387,7 +506,7 @@ function renderQuestion(
       return (
         <select
           id={String(q.name)}
-          className={common}
+          className={base}
           value={value}
           onChange={(e) =>
             setField(key, e.target.value as LongevityFormData[typeof key])
@@ -412,11 +531,8 @@ function renderQuestion(
 
       function toggle(val: string) {
         const set = new Set(current);
-        if (set.has(val)) {
-          set.delete(val);
-        } else {
-          set.add(val);
-        }
+        if (set.has(val)) set.delete(val);
+        else set.add(val);
         setField(
           key,
           Array.from(set) as unknown as LongevityFormData[typeof key]
@@ -435,6 +551,8 @@ function renderQuestion(
                 className={`rounded-xl border px-3 py-2 text-sm ${
                   active
                     ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    : hasError
+                    ? "border-red-300 bg-red-50 text-slate-800"
                     : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
               >
@@ -465,6 +583,8 @@ function renderQuestion(
                 className={`rounded-2xl border px-3 py-2 text-sm ${
                   active
                     ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    : hasError
+                    ? "border-red-300 bg-red-50 text-slate-800"
                     : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                 }`}
               >
