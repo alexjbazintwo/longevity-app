@@ -1,12 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700&display=swap');
 
-/* Tailwind layers must come before any @layer usage */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens (light by default) */
 @layer base {
+  .theme-hybrid {
+    --primary: 210 100% 50%;
+    --accent: 174 60% 40%;
+    --secondary: 152 76% 40%;
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -39,7 +42,6 @@
     --radius: 0.75rem;
   }
 
-  /* Dark theme tokens (apply by adding class="dark" on a wrapper) */
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;

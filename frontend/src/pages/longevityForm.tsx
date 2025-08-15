@@ -241,7 +241,7 @@ export default function LongevityFormPage() {
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/90 via-emerald-400/80 to-teal-500/90 shadow-sm shadow-emerald-500/20" />
             <div className="text-sm font-semibold tracking-tight">
-              FIT to 100 • Assessment
+              Runzi • Assessment
             </div>
           </div>
           <div className="flex items-center gap-2">

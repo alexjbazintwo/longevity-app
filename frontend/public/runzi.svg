@@ -1,0 +1,27 @@
+<!-- public/runzi.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Runzi logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="0.5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Slight halo for contrast on white -->
+  <g transform="translate(256 220) scale(2.00) translate(-256 -256)" shape-rendering="geometricPrecision">
+    <path
+      d="M170 348l72-92h-58v-38h112c18 0 32 14 32 32 0 12-6 22-15 28l-39 25 53 45h-56l-40-36-23 36h-38z"
+      fill="none"
+      stroke="#0b0b0b"
+      stroke-opacity="0.32"
+      stroke-width="14"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+    <path
+      d="M170 348l72-92h-58v-38h112c18 0 32 14 32 32 0 12-6 22-15 28l-39 25 53 45h-56l-40-36-23 36h-38z"
+      fill="url(#g)"
+    />
+  </g>
+</svg>

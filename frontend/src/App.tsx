@@ -6,39 +6,38 @@ import Header from "@/components/header";
 import Footer from "@/components/footer";
 import { ResultProvider } from "@/context/resultContext";
 
-// Lazy-load pages for faster initial paint
+// Lazy-load pages
 const Home = lazy(() => import("@/pages/home"));
 const LongevityForm = lazy(() => import("@/pages/longevityForm"));
 const LongevityResult = lazy(() => import("@/pages/longevityResult"));
+const Onboarding = lazy(() => import("@/pages/onboarding"));
+const PlanPreview = lazy(() => import("@/pages/planPreview"));
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <ResultProvider>
         <ScrollToTop />
-        <AppLayout />
+        <AppShell />
       </ResultProvider>
     </BrowserRouter>
   );
 }
 
-function AppLayout() {
-  const location = useLocation();
-  const isHome = location.pathname === "/";
-
+function AppShell() {
   return (
     <>
-      {!isHome && <Header />}
-
+      <Header />
       <Suspense fallback={<FullScreenLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/life-expectancy-form" element={<LongevityForm />} />
           <Route path="/life-expectancy-result" element={<LongevityResult />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/plan-preview" element={<PlanPreview />} />
         </Routes>
       </Suspense>
-
-      {!isHome && <Footer />}
+      <Footer />
     </>
   );
 }
@@ -58,5 +57,3 @@ function FullScreenLoader() {
     </div>
   );
 }
-
-export default App;
