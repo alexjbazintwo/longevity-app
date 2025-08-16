@@ -1,5 +1,5 @@
-import type { FormData } from "../types/longevityForm";
-import type { LongevityPredictionResponse } from "../types/longevityResult";
+import type { FormData } from "../types/longevity/longevityForm";
+import type { LongevityPredictionResponse } from "../types/longevity/longevityResult";
 
 export function useSubmitForm() {
   const submit = async (

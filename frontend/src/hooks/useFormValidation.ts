@@ -1,4 +1,4 @@
-import type { FormData, Question } from "../types/longevityForm";
+import type { FormData, Question } from "../types/longevity/longevityForm";
 export function validateForm(
   formData: Partial<FormData>,
   subset?: Question[]

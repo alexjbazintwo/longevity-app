@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useMemo, useEffect } from "react";
 import type { ReactNode } from "react";
-import type { LongevityPredictionResponse } from "../types/longevityResult";
+import type { LongevityPredictionResponse } from "../types/longevity/longevityResult";
 
 type StoredResult = LongevityPredictionResponse & { dob: string };
 

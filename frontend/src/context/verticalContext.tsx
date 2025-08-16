@@ -1,38 +1,50 @@
-/* eslint react-refresh/only-export-components: ["warn", { "allowExportNames": ["useVertical"] }] */
-import React, {
+import {
   createContext,
   useContext,
   useEffect,
   useMemo,
   useState,
+  type ReactNode,
 } from "react";
-import type { VerticalPack } from "@/types/vertical";
 import { getPack } from "@/verticals";
-import { readInitialVertical } from "@/context/vertical.helpers";
+import type { ExtendedVerticalPack } from "@/types/vertical";
+
+type VerticalKey = "running";
 
 type VerticalContextValue = {
-  pack: VerticalPack;
-  setVertical: (slug: string) => void;
+  pack: ExtendedVerticalPack;
+  setVertical: (key: VerticalKey) => void;
 };
 
 const VerticalContext = createContext<VerticalContextValue | undefined>(
   undefined
 );
 
-export function VerticalProvider({ children }: { children: React.ReactNode }) {
-  const [slug, setSlug] = useState<string>(readInitialVertical);
-  const pack = useMemo(() => getPack(slug), [slug]);
+export function VerticalProvider({ children }: { children: ReactNode }) {
+  const [key, setKey] = useState<VerticalKey>("running");
+  const pack = useMemo(() => getPack(key), [key]);
 
   useEffect(() => {
-    const cls = pack.themeClass || "";
-    document.body.classList.add(cls);
-    return () => {
-      document.body.classList.remove(cls);
-    };
+    const root = document.documentElement;
+
+    if (!root.classList.contains("dark")) {
+      root.classList.add("dark");
+    }
+
+    Array.from(root.classList)
+      .filter((c) => c.startsWith("theme-"))
+      .forEach((c) => root.classList.remove(c));
+
+    if (pack.themeClass) {
+      root.classList.add(pack.themeClass);
+    }
   }, [pack.themeClass]);
 
   const value = useMemo<VerticalContextValue>(
-    () => ({ pack, setVertical: setSlug }),
+    () => ({
+      pack,
+      setVertical: (k: VerticalKey) => setKey(k),
+    }),
     [pack]
   );
 

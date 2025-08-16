@@ -1,4 +1,4 @@
-import type { ExtendedVerticalPack } from "@/types/vertical-extended";
+import type { ExtendedVerticalPack } from "@/types/vertical";
 
 export const runningPack: ExtendedVerticalPack = {
   slug: "running",
@@ -9,7 +9,7 @@ export const runningPack: ExtendedVerticalPack = {
     subhead:
       "From first steps to podium form — fit or on the comeback. An AI-personalised plan that evolves to your needs.",
     ctas: [
-      { label: "Start smarter training", to: "/onboarding", kind: "primary" },
+      { label: "Start smarter training", to: "/setup", kind: "primary" },
       { label: "See my AI-tuned week", to: "/plan-preview", kind: "secondary" },
     ],
     slides: [
@@ -32,7 +32,7 @@ export const runningPack: ExtendedVerticalPack = {
     },
   },
   nav: [
-    { label: "Plans", to: "/onboarding" },
+    { label: "Plans", to: "/setup" },
     { label: "Paces", to: "/#" },
     { label: "How it works", to: "/#" },
     { label: "Pricing", to: "/#" },
@@ -42,7 +42,7 @@ export const runningPack: ExtendedVerticalPack = {
     {
       key: "c25k",
       title: "Couch → 5K",
-      desc: "Walk-run progression, zero to consistent.",
+      desc: "Walk-run progression.",
       icon: "Activity",
     },
     {
@@ -54,104 +54,227 @@ export const runningPack: ExtendedVerticalPack = {
     {
       key: "10k_pr",
       title: "10K PR",
-      desc: "Threshold focus & endurance.",
+      desc: "Threshold focus.",
       icon: "Activity",
     },
     {
       key: "half_marathon",
       title: "Half Marathon",
-      desc: "Tempo strength & long runs.",
+      desc: "Tempo & long runs.",
       icon: "Timer",
     },
     {
       key: "marathon",
       title: "Marathon",
-      desc: "Aerobic base, long runs, fueling.",
+      desc: "Aerobic base & fueling.",
       icon: "Timer",
     },
     {
       key: "trail",
       title: "Trail Running",
-      desc: "Vert, terrain, technique & strength.",
+      desc: "Vert & technique.",
       icon: "Activity",
     },
   ],
-  onboardingSchema: [
+  intakeSchema: [
     {
-      title: "Your race focus",
-      subtitle: "Pick an event & timeline",
+      title: "Race details",
+      subtitle:
+        "Tell us about your event so we can tailor your build and taper.",
       fields: [
         {
           type: "singleChoice",
-          id: "event",
-          label: "Event",
+          id: "raceDistance",
+          label: "Race distance",
           required: true,
           options: [
-            { key: "c25k", label: "Couch → 5K" },
             { key: "5k", label: "5K" },
             { key: "10k", label: "10K" },
             { key: "half", label: "Half Marathon" },
             { key: "marathon", label: "Marathon" },
-            { key: "trail", label: "Trail" },
+            { key: "ultra", label: "Ultra" },
           ],
         },
         {
+          type: "number",
+          id: "raceWeeksOut",
+          label: "Weeks until race",
+          required: true,
+          min: 1,
+          max: 52,
+          step: 1,
+        },
+        {
+          type: "text",
+          id: "targetTime",
+          label: "Target time",
+          required: false,
+          placeholder: "Optional (e.g., 1:35:00)",
+        },
+        {
+          type: "text",
+          id: "courseNotes",
+          label: "Course notes",
+          required: false,
+          placeholder: "Optional (hilly, hot, trail…)",
+        },
+      ],
+    },
+    {
+      title: "Distance milestone",
+      subtitle: "Not racing? We’ll plan towards a continuous distance goal.",
+      fields: [
+        {
           type: "singleChoice",
-          id: "timeline",
-          label: "Plan length",
+          id: "distanceGoal",
+          label: "Milestone",
           required: true,
           options: [
-            { key: "12w", label: "12 weeks" },
-            { key: "16w", label: "16 weeks" },
-            { key: "20w", label: "20 weeks" },
-            { key: "24w", label: "24 weeks" },
+            { key: "5k", label: "5K continuous" },
+            { key: "10k", label: "10K continuous" },
+            { key: "21k", label: "Half marathon distance" },
+            { key: "42k", label: "Marathon distance" },
           ],
         },
         {
-          type: "singleChoice",
-          id: "experience",
-          label: "Running background",
+          type: "number",
+          id: "weeksToMilestone",
+          label: "Weeks to milestone",
           required: true,
+          min: 1,
+          max: 52,
+          step: 1,
+        },
+        {
+          type: "singleChoice",
+          id: "runWalkPreference",
+          label: "Run-walk preference",
+          required: false,
           options: [
-            { key: "beginner", label: "Beginner" },
-            { key: "intermediate", label: "Intermediate" },
-            { key: "advanced", label: "Advanced" },
+            { key: "run_walk", label: "Run–walk" },
+            { key: "run_only", label: "Run only" },
+            { key: "either", label: "Open to either" },
           ],
         },
       ],
     },
     {
-      title: "Your constraints",
-      subtitle: "Time & current load",
+      title: "Health focus",
+      subtitle: "Build capacity without chasing a race.",
       fields: [
         {
-          type: "hoursPerWeek",
-          id: "hours",
-          label: "Hours per week you can run",
+          type: "singleChoice",
+          id: "healthFocus",
+          label: "What’s the focus?",
           required: true,
-          min: 2,
-          max: 12,
+          options: [
+            { key: "cardio", label: "Cardio capacity" },
+            { key: "energy", label: "Energy & vitality" },
+            { key: "stress", label: "Stress resilience" },
+          ],
         },
         {
           type: "number",
-          id: "currentMileage",
-          label: "Current weekly mileage (km)",
-          required: true,
-          min: 0,
-          max: 200,
+          id: "restingHr",
+          label: "Resting heart rate",
+          required: false,
+          min: 30,
+          max: 110,
           step: 1,
         },
         {
           type: "text",
-          id: "injuries",
-          label: "Any injuries or constraints (optional)",
-          placeholder: "e.g., Achilles niggle, IT band, plantar",
+          id: "healthNotes",
+          label: "Context",
+          required: false,
+          placeholder: "Optional (sleep, work stress, etc.)",
+        },
+      ],
+    },
+    {
+      title: "Comeback",
+      subtitle: "If you’re returning, we’ll tread carefully and ramp safely.",
+      fields: [
+        {
+          type: "singleChoice",
+          id: "physioCleared",
+          label: "Cleared to run?",
+          required: true,
+          options: [
+            { key: "yes", label: "Yes" },
+            { key: "no", label: "No" },
+            { key: "unsure", label: "Unsure" },
+          ],
+        },
+        {
+          type: "text",
+          id: "injuryArea",
+          label: "Injury/area",
+          required: false,
+          placeholder: "Optional (e.g., Achilles, ITB)",
+        },
+        {
+          type: "number",
+          id: "painNow",
+          label: "Pain now (0–10)",
+          required: false,
+          min: 0,
+          max: 10,
+          step: 1,
+        },
+        {
+          type: "multiSelect",
+          id: "avoidances",
+          label: "Avoid for now",
+          required: false,
+          options: [
+            { key: "hills", label: "Hills" },
+            { key: "speed", label: "Speedwork" },
+            { key: "downhills", label: "Downhills" },
+            { key: "long90", label: "Long > 90min" },
+            { key: "track", label: "Track" },
+            { key: "trails", label: "Trails" },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Time & load",
+      subtitle: "We’ll bias intensity and volume around your constraints.",
+      fields: [
+        {
+          type: "hoursPerWeek",
+          id: "hours",
+          label: "Hours per week",
+          required: true,
+          min: 0,
+          max: 12,
+        },
+        {
+          type: "singleChoice",
+          id: "units",
+          label: "Distance units",
+          required: true,
+          options: [
+            { key: "km", label: "Kilometres (km)" },
+            { key: "mi", label: "Miles (mi)" },
+          ],
+        },
+        {
+          type: "number",
+          id: "currentMileage",
+          label: "Current weekly distance",
+          required: false,
+          min: 0,
+          max: 300,
+          step: 1,
         },
       ],
     },
     {
       title: "Preferences",
-      subtitle: "Where & when you train",
+      subtitle:
+        "A few choices that shape surfaces, support and accountability.",
       fields: [
         {
           type: "singleChoice",
@@ -166,25 +289,68 @@ export const runningPack: ExtendedVerticalPack = {
         },
         {
           type: "singleChoice",
-          id: "timeOfDay",
-          label: "Time of day",
-          required: true,
-          options: [
-            { key: "morning", label: "Morning" },
-            { key: "evening", label: "Evening" },
-            { key: "varies", label: "Varies" },
-          ],
-        },
-        {
-          type: "singleChoice",
           id: "strengthSupport",
           label: "Include strength",
-          required: true,
+          required: false,
           options: [
             { key: "none", label: "No" },
             { key: "light", label: "Light (20–30 min)" },
             { key: "full", label: "Full (45–60 min)" },
           ],
+          placeholder: "Strength supports injury prevention and resilience.",
+        },
+        {
+          type: "singleChoice",
+          id: "mobility",
+          label: "Mobility / stretching",
+          required: false,
+          options: [
+            { key: "none", label: "None" },
+            { key: "short", label: "Short (5–10 min)" },
+            { key: "standard", label: "Standard (10–15 min)" },
+            { key: "long", label: "Long (20+ min)" },
+          ],
+        },
+        {
+          type: "multiSelect",
+          id: "gear",
+          label: "Gear you use",
+          required: false,
+          options: [
+            { key: "watch", label: "GPS watch" },
+            { key: "hr", label: "Heart-rate strap" },
+            { key: "footpod", label: "Footpod" },
+            { key: "treadmill", label: "Treadmill" },
+            { key: "none", label: "No gadgets" },
+          ],
+        },
+        {
+          type: "multiSelect",
+          id: "dataSources",
+          label: "Connected apps",
+          required: false,
+          options: [
+            { key: "garmin", label: "Garmin" },
+            { key: "strava", label: "Strava" },
+            { key: "apple", label: "Apple Health" },
+            { key: "polar", label: "Polar Flow" },
+            { key: "coros", label: "Coros" },
+            { key: "suunto", label: "Suunto" },
+            { key: "none", label: "None" },
+          ],
+        },
+        {
+          type: "singleChoice",
+          id: "coachingStyle",
+          label: "Coaching style",
+          required: false,
+          options: [
+            { key: "gentle", label: "Gentle" },
+            { key: "data", label: "Data-driven" },
+            { key: "direct", label: "Direct" },
+            { key: "minimal", label: "Minimal" },
+          ],
+          placeholder: "Affects tone, detail, and frequency of nudges.",
         },
       ],
     },
@@ -240,11 +406,11 @@ export const runningPack: ExtendedVerticalPack = {
     {
       key: "aiPlanning",
       title: "Personalised plans that adapt every week",
-      text: "No templates. Coach Kaia adjusts paces, long-run structure and recovery to your sleep, stress, and consistency — so each week targets exactly what moves you forward.",
+      text: "No templates. Coach Kaia adjusts paces, long-run structure and recovery to your sleep, stress, and consistency — so each week targets what moves you forward.",
       bullets: [
         "Auto-calculated training paces",
         "Adaptive long runs & recovery",
-        "Progress you can actually feel",
+        "Progress you can feel",
       ],
       image:
         "https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
@@ -254,7 +420,7 @@ export const runningPack: ExtendedVerticalPack = {
     {
       key: "prChasing",
       title: "Chasing a PR? Periodize and peak at the right time",
-      text: "We tune threshold/VO₂ work, long-run structure and taper timing from your data. Honest paces keep you fast without flirting with burnout.",
+      text: "We tune threshold/VO₂ work, long-run structure and taper timing from your data. Honest paces keep you fast without burnout.",
       bullets: [
         "Auto-paced quality sessions",
         "Block-by-block periodization",
@@ -324,24 +490,28 @@ export const runningPack: ExtendedVerticalPack = {
     {
       name: "Amira S.",
       role: "Marathoner",
-      text: "The first plan that adapted to my life. My long runs finally clicked—and I PR’d by 9 minutes.",
+      text: "The first plan that adapted to my life. I PR’d by 9 minutes.",
     },
     {
       name: "Daniel P.",
       role: "10K/Engineer",
-      text: "Coach Kaia catches fatigue before I do. The tweaks kept me healthy and progressing.",
+      text: "Kaia catches fatigue before I do. I kept progressing, injury-free.",
     },
     {
       name: "Chloe R.",
       role: "Half Marathon",
-      text: "The paces and structure removed guesswork. I stopped winging it and started improving.",
+      text: "The structure removed guesswork. I finally improved consistently.",
     },
   ],
-  assets: {
-    featureImages: [
-      "https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
-      "https://images.pexels.com/photos/3601094/pexels-photo-3601094.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
-      "https://images.pexels.com/photos/891226/pexels-photo-891226.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
-    ],
-  },
+  assets: { featureImages: [] },
 };
+
+export const packs = {
+  running: runningPack,
+} as const;
+
+export type VerticalKey = keyof typeof packs;
+
+export function getPack(key: VerticalKey): ExtendedVerticalPack {
+  return packs[key];
+}

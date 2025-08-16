@@ -1,15 +1,12 @@
-// src/verticals/index.ts
-import type { VerticalPack } from "@/types/vertical";
-import { hybridPack } from "@/verticals/hybrid/config";
-import { runningPack } from "@/verticals/running/config";
+import { runningPack } from "@/verticals/running/pack";
 
-export const PACKS: Record<string, VerticalPack> = {
-  hybrid: hybridPack,
+const packs = {
   running: runningPack,
-  // masters: mastersPack, // later
 };
+export type VerticalSlug = keyof typeof packs;
 
-export function getPack(slug?: string): VerticalPack {
-  const key = (slug ?? "").toLowerCase();
-  return PACKS[key] ?? runningPack; // default to running
+export function getPack(slug: VerticalSlug) {
+  return packs[slug] ?? packs.running;
 }
+
+export { runningPack };

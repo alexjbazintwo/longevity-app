@@ -1,59 +1,32 @@
-// src/App.tsx
-import { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
-import { ResultProvider } from "@/context/resultContext";
+import Home from "@/pages/home";
+import PlanSetup from "@/pages/planSetup";
+import PlanPreview from "@/pages/planPreview";
 
-// Lazy-load pages
-const Home = lazy(() => import("@/pages/home"));
-// const LongevityForm = lazy(() => import("@/pages/longevity/longevityForm"));
-// const LongevityResult = lazy(() => import("@/pages/longevityResult"));
-const Onboarding = lazy(() => import("@/pages/onboarding"));
-const PlanPreview = lazy(() => import("@/pages/planPreview"));
+function Layout() {
+  return (
+    <div className="min-h-screen text-foreground">
+      <Header />
+      <main className="bg-transparent">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <ResultProvider>
-        <ScrollToTop />
-        <AppShell />
-      </ResultProvider>
-    </BrowserRouter>
-  );
-}
-
-function AppShell() {
-  return (
-    <>
-      <Header />
-      <Suspense fallback={<FullScreenLoader />}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          {/* <Route path="/life-expectancy-form" element={<LongevityForm />} />
-          <Route path="/life-expectancy-result" element={<LongevityResult />} /> */}
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/plan-preview" element={<PlanPreview />} />
+          <Route element={<Layout />}>
+            <Route index element={<Home />} />
+            <Route path="setup" element={<PlanSetup />} />
+            <Route path="plan-preview" element={<PlanPreview />} />
+          </Route>
         </Routes>
-      </Suspense>
-      <Footer />
-    </>
-  );
-}
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
-  }, [pathname]);
-  return null;
-}
-
-function FullScreenLoader() {
-  return (
-    <div className="grid min-h-[60vh] place-items-center text-white/80">
-      Loading…
-    </div>
+    </BrowserRouter>
   );
 }

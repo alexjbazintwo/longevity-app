@@ -1,5 +1,5 @@
 import LifeExpectancyChart from "./lifeExpectancyChart";
-import type { LongevityPredictionResponse } from "../types/longevityResult";
+import type { LongevityPredictionResponse } from "../types/longevity/longevityResult";
 
 interface LongevityInsightsProps {
   result: LongevityPredictionResponse;

@@ -1,5 +1,5 @@
 import { getNames } from "country-list";
-import type { Question } from "../types/longevityForm";
+import type { Question } from "../types/longevity/longevityForm";
 
 const preferredCountry = "United Kingdom";
 const allCountries = getNames()

@@ -18,7 +18,7 @@ import { questionSections } from "@/data/questions";
 import type {
   Question,
   FormData as LongevityFormData,
-} from "@/types/longevityForm";
+} from "@/types/longevity/longevityForm";
 import { useSubmitForm } from "@/hooks/useSubmitForm";
 import { validateForm } from "@/hooks/useFormValidation";
 import { useResultContext } from "@/context/resultContext";

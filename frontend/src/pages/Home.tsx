@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useState,
   type ComponentType,
   type ReactNode,
@@ -22,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useVertical } from "@/context/verticalContext";
-import type { ExtendedVerticalPack, IconName } from "@/types/vertical-extended";
+import type { ExtendedVerticalPack, IconName } from "@/types/vertical";
 
 const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
   HeartPulse,
@@ -37,14 +36,9 @@ function renderIcon(name: IconName, sizeClass: string) {
   return <Cmp className={sizeClass} />;
 }
 
-type HeroCTA = ExtendedVerticalPack["hero"]["ctas"][number];
-type FeatureT = ExtendedVerticalPack["features"][number];
-type CTAStatT = ExtendedVerticalPack["cta"]["smartAnalytics"]["stats"][number];
-type ReviewT = ExtendedVerticalPack["reviews"][number];
-
 export default function Home() {
   const { pack: rawPack } = useVertical();
-  const pack = rawPack as unknown as ExtendedVerticalPack;
+  const pack = rawPack as ExtendedVerticalPack;
 
   const [activeSlide, setActiveSlide] = useState(0);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
@@ -66,15 +60,17 @@ export default function Home() {
     return () => clearInterval(id);
   }, [pack.hero.slides, failed]);
 
-  const bubbles = useMemo(() => pack.outcomes.items, [pack.outcomes.items]);
   const currentSrc = pack.hero.slides[activeSlide];
   const credit = attributionBySrc[currentSrc];
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen text-white">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#0a1024] via-[#0a1024] to-black" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_12%_-8%,rgba(251,191,36,0.12),transparent_35%),radial-gradient(circle_at_85%_0%,rgba(56,189,248,0.12),transparent_38%)]" />
+
       <section className="relative isolate">
         <div className="absolute inset-0 overflow-hidden">
-          {pack.hero.slides.map((src: string, i: number) => {
+          {pack.hero.slides.map((src, i) => {
             const hidden = failed[src];
             return (
               <motion.img
@@ -125,7 +121,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            {pack.hero.ctas.map((cta: HeroCTA) => (
+            {pack.hero.ctas.map((cta) => (
               <Button
                 key={cta.label}
                 asChild
@@ -146,7 +142,7 @@ export default function Home() {
 
           <div className="mt-8 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
             <p className="text-xs uppercase tracking-wider text-white/85">
-              {pack.proof.title}
+              Why AI beats templates
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {pack.proof.stats.map((s) => (
@@ -182,7 +178,7 @@ export default function Home() {
             {pack.outcomes.title}
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {bubbles.map((b) => (
+            {pack.outcomes.items.map((b) => (
               <Card
                 key={b.label}
                 className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
@@ -230,7 +226,7 @@ export default function Home() {
       <section className="relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.12),transparent_35%)]" />
         <div className="relative mx-auto w-full max-w-7xl space-y-20 px-4 py-20 sm:px-8">
-          {pack.features.map((f: FeatureT) => (
+          {pack.features.map((f) => (
             <FeatureRow
               key={f.key}
               title={f.title}
@@ -259,7 +255,7 @@ export default function Home() {
                 className="rounded-xl bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 text-black"
                 asChild
               >
-                <Link to="/onboarding">
+                <Link to="/setup">
                   Try it free now
                   <PlayCircle className="ml-2 h-4 w-4" />
                 </Link>
@@ -273,7 +269,7 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {pack.cta.smartAnalytics.stats.map((s: CTAStatT, i: number) => (
+            {pack.cta.smartAnalytics.stats.map((s, i) => (
               <MiniStat
                 key={i}
                 icon={renderIcon(s.icon, "h-4 w-4")}
@@ -291,7 +287,7 @@ export default function Home() {
             What runners say
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {pack.reviews.map((r: ReviewT, i: number) => (
+            {pack.reviews.map((r, i) => (
               <ReviewCard key={i} name={r.name} role={r.role} text={r.text} />
             ))}
           </div>
@@ -311,7 +307,7 @@ function ProofStat({
   note?: string;
 }) {
   return (
-    <div className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10">
+    <div className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10">
       <div className="text-2xl font-semibold">{value}</div>
       <div className="text-sm text-white/85">{label}</div>
       {note && <div className="text-[11px] text-white/75">{note}</div>}

@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Line,
 } from "recharts";
-import type { LongevitySurvivalPoint } from "../types/longevityResult";
+import type { LongevitySurvivalPoint } from "../types/longevity/longevityResult";
 
 interface LongevityChartProps {
   currentAge: number;

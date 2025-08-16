@@ -1,47 +1,35 @@
-export type OnboardingField =
-  | {
-      type: "singleChoice";
-      id: string;
-      label: string;
-      required?: boolean;
-      options: { key: string; label: string }[];
-    }
-  | {
-      type: "multiChoice";
-      id: string;
-      label: string;
-      required?: boolean;
-      options: { key: string; label: string }[];
-    }
-  | {
-      type: "number";
-      id: string;
-      label: string;
-      required?: boolean;
-      min?: number;
-      max?: number;
-      step?: number;
-    }
-  | {
-      type: "hoursPerWeek";
-      id: string;
-      label: string;
-      required?: boolean;
-      min: number;
-      max: number;
-    }
-  | {
-      type: "text";
-      id: string;
-      label: string;
-      required?: boolean;
-      placeholder?: string;
-    };
+import type { IntakeSchema } from "./intake";
 
-export type OnboardingStep = {
+export type CTAKind = "primary" | "secondary";
+
+export type Brand = {
+  name: string;
+  tagline: string;
+};
+
+export type HeroCTA = {
+  label: string;
+  to: string;
+  kind: CTAKind;
+};
+
+export type Hero = {
+  headline: string;
+  subhead: string;
+  ctas: HeroCTA[];
+  slides: string[];
+};
+
+export type NavItem = {
+  label: string;
+  to: string;
+};
+
+export type Goal = {
+  key: string;
   title: string;
-  subtitle?: string;
-  fields: OnboardingField[];
+  desc: string;
+  icon: string;
 };
 
 export type PlanWeights = {
@@ -53,42 +41,79 @@ export type PlanWeights = {
   nutrition: number;
 };
 
-export type VerticalPack = {
-  /** short slug like "hybrid" or "masters" */
-  slug: string;
-  /** CSS theme class to attach to <body> (e.g., "theme-hybrid") */
-  themeClass: string;
-
-  brand: {
-    name: string;
-    tagline: string;
-  };
-
-  hero: {
-    headline: string;
-    subhead: string;
-    ctas: { label: string; to: string; kind: "primary" | "secondary" }[];
-    slides: string[];
-  };
-
-  nav: { label: string; to: string }[];
-
-  goals: { key: string; title: string; desc: string; icon: string }[];
-
-  onboardingSchema: OnboardingStep[];
-
-  planWeights: PlanWeights;
-
-  copy: {
-    trust: { title: string; body: string };
-    philosophy: { title: string; body: string };
-    analytics: { title: string; body: string };
-  };
-
-  assets: {
-    featureImages: string[]; // 3 images used on home "feature" rows
-  };
-
-  /** Optional custom plan strategy hook-in (we'll wire later) */
-  planStrategy?: (state: Record<string, unknown>) => PlanWeights;
+export type CopyBlock = {
+  title: string;
+  body: string;
 };
+
+export type Copy = {
+  trust: CopyBlock;
+  philosophy: CopyBlock;
+  analytics: CopyBlock;
+};
+
+export type Assets = {
+  featureImages: string[];
+};
+
+export type VerticalPack = {
+  slug: string;
+  themeClass: string;
+  brand: Brand;
+  hero: Hero;
+  nav: NavItem[];
+  goals: Goal[];
+  intakeSchema: IntakeSchema;
+  planWeights: PlanWeights;
+  copy: Copy;
+  assets: Assets;
+};
+
+export type IconName =
+  | "HeartPulse"
+  | "Trophy"
+  | "Activity"
+  | "Brain"
+  | "LineChart";
+
+export type ProofStatItem = {
+  value: string;
+  label: string;
+  note?: string;
+};
+
+export type OutcomeItem = {
+  label: string;
+  value: string;
+};
+
+export type CTAStat = {
+  icon: IconName;
+  label: string;
+  value: string;
+};
+
+export type FeatureBlock = {
+  key: string;
+  title: string;
+  text: string;
+  bullets: string[];
+  image: string;
+  icon: IconName;
+  reverse?: boolean;
+};
+
+export interface ExtendedHero extends Hero {
+  objectPosition?: Record<string, string>;
+  credits?: Record<string, { label: string; href: string }>;
+}
+
+export interface ExtendedVerticalPack extends Omit<VerticalPack, "hero"> {
+  hero: ExtendedHero;
+  trust?: { badges: string[] };
+  proof: { title: string; stats: ProofStatItem[]; footnote: string };
+  outcomes: { title: string; items: OutcomeItem[] };
+  features: FeatureBlock[];
+  cta: { smartAnalytics: { title: string; body: string; stats: CTAStat[] } };
+  reviews: { name: string; role: string; text: string }[];
+}

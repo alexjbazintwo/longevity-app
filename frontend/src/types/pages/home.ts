@@ -1,5 +1,3 @@
-import type { VerticalPack } from "./vertical";
-
 export type IconName =
   | "HeartPulse"
   | "Trophy"
@@ -21,19 +19,26 @@ export type FeatureBlock = {
   reverse?: boolean;
 };
 
-type BaseHero = VerticalPack["hero"];
-
-export type ExtendedHero = BaseHero & {
+export type HomeHeroExtras = {
   objectPosition?: Record<string, string>;
   credits?: Record<string, { label: string; href: string }>;
 };
 
-export type ExtendedVerticalPack = Omit<VerticalPack, "hero"> & {
-  hero: ExtendedHero;
-  trust?: { badges: string[] };
+export type HomeContent = {
+  heroExtras?: HomeHeroExtras;
   proof: { title: string; stats: ProofStatItem[]; footnote: string };
-  outcomes: { title: string; items: OutcomeItem[] };
+  outcomes: { title: string; items: OutcomeItem[]; footnote?: string };
   features: FeatureBlock[];
-  cta: { smartAnalytics: { title: string; body: string; stats: CTAStat[] } };
+  cta: {
+    smartAnalytics: {
+      title: string;
+      body: string;
+      primaryCta: { label: string; to: string };
+      secondaryCta?: { label: string; to: string };
+      stats: CTAStat[];
+    };
+  };
+  labels?: { featureChip: string };
+  reviewsTitle: string;
   reviews: { name: string; role: string; text: string }[];
 };
