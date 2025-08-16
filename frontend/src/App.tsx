@@ -8,8 +8,8 @@ import { ResultProvider } from "@/context/resultContext";
 
 // Lazy-load pages
 const Home = lazy(() => import("@/pages/home"));
-const LongevityForm = lazy(() => import("@/pages/longevityForm"));
-const LongevityResult = lazy(() => import("@/pages/longevityResult"));
+// const LongevityForm = lazy(() => import("@/pages/longevity/longevityForm"));
+// const LongevityResult = lazy(() => import("@/pages/longevityResult"));
 const Onboarding = lazy(() => import("@/pages/onboarding"));
 const PlanPreview = lazy(() => import("@/pages/planPreview"));
 
@@ -31,8 +31,8 @@ function AppShell() {
       <Suspense fallback={<FullScreenLoader />}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/life-expectancy-form" element={<LongevityForm />} />
-          <Route path="/life-expectancy-result" element={<LongevityResult />} />
+          {/* <Route path="/life-expectancy-form" element={<LongevityForm />} />
+          <Route path="/life-expectancy-result" element={<LongevityResult />} /> */}
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/plan-preview" element={<PlanPreview />} />
         </Routes>

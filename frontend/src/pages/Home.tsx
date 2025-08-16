@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -10,16 +16,41 @@ import {
   LineChart,
   PlayCircle,
   Cpu,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useVertical } from "@/context/verticalContext";
+import type { ExtendedVerticalPack, IconName } from "@/types/vertical-extended";
+
+const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
+  HeartPulse,
+  Trophy,
+  Activity,
+  Brain,
+  LineChart,
+};
+
+function renderIcon(name: IconName, sizeClass: string) {
+  const Cmp = iconMap[name] ?? Activity;
+  return <Cmp className={sizeClass} />;
+}
+
+type HeroCTA = ExtendedVerticalPack["hero"]["ctas"][number];
+type FeatureT = ExtendedVerticalPack["features"][number];
+type CTAStatT = ExtendedVerticalPack["cta"]["smartAnalytics"]["stats"][number];
+type ReviewT = ExtendedVerticalPack["reviews"][number];
 
 export default function Home() {
-  const { pack } = useVertical();
+  const { pack: rawPack } = useVertical();
+  const pack = rawPack as unknown as ExtendedVerticalPack;
+
   const [activeSlide, setActiveSlide] = useState(0);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
+
+  const attributionBySrc = pack.hero.credits ?? {};
+  const heroObjectPosition = pack.hero.objectPosition ?? {};
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -35,22 +66,15 @@ export default function Home() {
     return () => clearInterval(id);
   }, [pack.hero.slides, failed]);
 
-  const bubbles = useMemo(
-    () => [
-      { label: "race time (12–24 wks)", value: "-3.4%" },
-      { label: "resting heart rate", value: "-7 bpm" },
-      { label: "injury days per block", value: "-23%" },
-      { label: "plan adherence", value: "+29%" },
-    ],
-    []
-  );
+  const bubbles = useMemo(() => pack.outcomes.items, [pack.outcomes.items]);
+  const currentSrc = pack.hero.slides[activeSlide];
+  const credit = attributionBySrc[currentSrc];
 
   return (
     <div className="dark min-h-screen bg-background text-foreground">
-      {/* HERO with slideshow background */}
       <section className="relative isolate">
         <div className="absolute inset-0 overflow-hidden">
-          {pack.hero.slides.map((src, i) => {
+          {pack.hero.slides.map((src: string, i: number) => {
             const hidden = failed[src];
             return (
               <motion.img
@@ -60,6 +84,7 @@ export default function Home() {
                 className={`absolute inset-0 h-full w-full object-cover ${
                   hidden ? "hidden" : ""
                 }`}
+                style={{ objectPosition: heroObjectPosition[src] ?? "50% 50%" }}
                 initial={{ opacity: 0, scale: 1.05 }}
                 animate={{
                   opacity: activeSlide === i ? 1 : 0,
@@ -70,7 +95,6 @@ export default function Home() {
               />
             );
           })}
-          {/* Slightly navy-tinted overlay so the hero gels with the header */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#0a1024]/40 via-[#0a1024]/35 to-black/75" />
           <div className="pointer-events-none absolute -right-20 -top-24 h-96 w-96 rounded-full bg-orange-400/15 blur-[100px]" />
           <div className="pointer-events-none absolute left-10 bottom-0 h-72 w-72 rounded-full bg-sky-400/10 blur-[90px]" />
@@ -101,7 +125,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            {pack.hero.ctas.map((cta) => (
+            {pack.hero.ctas.map((cta: HeroCTA) => (
               <Button
                 key={cta.label}
                 asChild
@@ -120,69 +144,66 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Promise / Proof strip */}
           <div className="mt-8 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
             <p className="text-xs uppercase tracking-wider text-white/85">
-              Why AI beats templates
+              {pack.proof.title}
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <ProofStat
-                value="2.2×"
-                label="Higher PR rate"
-                note="at target race"
-              />
-              <ProofStat
-                value="+35%"
-                label="Comfortable distance"
-                note="longest run in 12 wks"
-              />
-              <ProofStat
-                value="-30%"
-                label="Injury days"
-                note="per training block"
-              />
-              <ProofStat
-                value="+29%"
-                label="Plan adherence"
-                note="vs static plans"
-              />
-            </div>
-            <div className="mt-2 text-[11px] text-white/75">
-              Internal cohort; illustrative for preview. Individual results
-              vary.
-            </div>
-          </div>
-
-          {/* Outcome bubbles */}
-          <div className="mt-8">
-            <p className="mb-4 text-xs uppercase tracking-wider text-white/75">
-              What runners improve with Coach Sigma (median after 12–24 weeks):
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {bubbles.map((b) => (
-                <Card
-                  key={b.label}
-                  className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
-                >
-                  <CardContent className="flex h-24 flex-col items-center justify-center p-0">
-                    <div className="text-3xl font-bold leading-none sm:text-4xl">
-                      {b.value}
-                    </div>
-                    <div className="mt-1 text-[11px] uppercase tracking-wider text-white/80">
-                      {b.label}
-                    </div>
-                  </CardContent>
-                </Card>
+              {pack.proof.stats.map((s) => (
+                <ProofStat
+                  key={s.label}
+                  value={s.value}
+                  label={s.label}
+                  note={s.note}
+                />
               ))}
             </div>
-            <div className="mt-2 text-[11px] text-white/70">
-              Illustrative; individual results vary.
+            <div className="mt-2 text-[11px] text-white/75">
+              {pack.proof.footnote}
             </div>
+          </div>
+        </div>
+
+        {credit && (
+          <a
+            href={credit.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 left-3 z-10 rounded-md bg-indigo-500/20 px-2 py-1 text-[10px] text-white/85 ring-1 ring-indigo-400/30 backdrop-blur"
+          >
+            {credit.label}
+          </a>
+        )}
+      </section>
+
+      <section className="relative">
+        <div className="relative mx-auto w-full max-w-7xl px-4 py-2 sm:px-8">
+          <p className="mb-4 text-xs uppercase tracking-wider text-white/75">
+            {pack.outcomes.title}
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {bubbles.map((b) => (
+              <Card
+                key={b.label}
+                className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
+              >
+                <CardContent className="flex h-24 flex-col items-center justify-center p-0">
+                  <div className="text-3xl font-bold leading-none sm:text-4xl">
+                    {b.value}
+                  </div>
+                  <div className="mt-1 text-[11px] uppercase tracking-wider text-white/80">
+                    {b.label}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="mt-2 text-[11px] text-white/70">
+            Illustrative; individual results vary.
           </div>
         </div>
       </section>
 
-      {/* Trust blurb */}
       <section className="border-y border-indigo-300/15 bg-gradient-to-b from-black to-black/95">
         <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 px-4 py-12 sm:grid-cols-3 sm:px-8">
           <div className="sm:col-span-2">
@@ -194,72 +215,44 @@ export default function Home() {
             </p>
           </div>
           <div className="grid grid-cols-3 items-center gap-4 opacity-90">
-            <Badge className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15">
-              AI Paces
-            </Badge>
-            <Badge className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15">
-              Coaching
-            </Badge>
-            <Badge className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15">
-              Insights
-            </Badge>
+            {(pack.trust?.badges ?? []).map((b) => (
+              <Badge
+                key={b}
+                className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15"
+              >
+                {b}
+              </Badge>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Feature rows */}
       <section className="relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.12),transparent_35%)]" />
         <div className="relative mx-auto w-full max-w-7xl space-y-20 px-4 py-20 sm:px-8">
-          <FeatureRow
-            title="Race-specific plans, tuned by AI each week"
-            text="Your plan evolves with your pace, load, sleep and stress—so you always work on what moves the needle now."
-            bullets={[
-              "Auto-calculated paces",
-              "Long-run structure & fuelling cues",
-              "Recovery-first scheduling",
-            ]}
-            image={pack.assets.featureImages[0]}
-            icon={<HeartPulse className="h-6 w-6" />}
-          />
-          <FeatureRow
-            reverse
-            title="Coach Sigma catches fatigue early"
-            text="We watch your consistency and HR trends to detect early fatigue or niggles—then re-route you with micro-adjustments."
-            bullets={[
-              "Daily nudges",
-              "Stress & load balance",
-              "Consistency tracking",
-            ]}
-            image={pack.assets.featureImages[1]}
-            icon={<Brain className="h-6 w-6" />}
-          />
-          <FeatureRow
-            title="Real-time analytics you can act on"
-            text="From race-pace zones to training load—see what matters this week and what to ignore. Clarity beats motivation."
-            bullets={[
-              "VO₂ proxy & thresholds",
-              "Zone 2 vs quality balance",
-              "Fatigue vs fitness trends",
-            ]}
-            image={pack.assets.featureImages[2]}
-            icon={<LineChart className="h-6 w-6" />}
-          />
+          {pack.features.map((f: FeatureT) => (
+            <FeatureRow
+              key={f.key}
+              title={f.title}
+              text={f.text}
+              bullets={f.bullets}
+              image={f.image}
+              icon={renderIcon(f.icon, "h-6 w-6")}
+              reverse={!!f.reverse}
+            />
+          ))}
         </div>
       </section>
 
-      {/* Smart Analytics CTA */}
       <section className="relative">
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(135deg,rgba(99,102,241,0.10),rgba(16,185,129,0.08))]" />
         <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 px-4 py-16 sm:grid-cols-2 sm:px-8">
           <div>
             <h3 className="text-2xl font-semibold sm:text-3xl">
-              Fit to 100 Smart Analytics
+              {pack.cta.smartAnalytics.title}
             </h3>
             <p className="mt-3 max-w-xl text-white/85">
-              Not templates—intelligence. Our AI coach adapts your training as
-              your data changes. Hit your PR or build a running habit for life,
-              without the guesswork.
+              {pack.cta.smartAnalytics.body}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
@@ -280,52 +273,27 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <MiniStat
-              icon={<Activity className="h-4 w-4" />}
-              label="Weekly km"
-              value="+28"
-            />
-            <MiniStat
-              icon={<HeartPulse className="h-4 w-4" />}
-              label="Resting HR"
-              value="-6 bpm"
-            />
-            <MiniStat
-              icon={<Brain className="h-4 w-4" />}
-              label="Stress score"
-              value="-18%"
-            />
-            <MiniStat
-              icon={<LineChart className="h-4 w-4" />}
-              label="Threshold pace"
-              value="+12s/km"
-            />
+            {pack.cta.smartAnalytics.stats.map((s: CTAStatT, i: number) => (
+              <MiniStat
+                key={i}
+                icon={renderIcon(s.icon, "h-4 w-4")}
+                label={s.label}
+                value={s.value}
+              />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Reviews */}
       <section>
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-8">
           <h3 className="mb-8 text-2xl font-semibold tracking-tight sm:text-3xl">
             What runners say
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <ReviewCard
-              name="Amira S."
-              role="Marathoner"
-              text="The first plan that adapted to my life. My long runs finally clicked—and I PR’d by 9 minutes."
-            />
-            <ReviewCard
-              name="Daniel P."
-              role="10K/Engineer"
-              text="Coach Sigma catches fatigue before I do. The tweaks kept me healthy and progressing."
-            />
-            <ReviewCard
-              name="Chloe R."
-              role="Half Marathon"
-              text="The paces and structure removed guesswork. I stopped winging it and started improving."
-            />
+            {pack.reviews.map((r: ReviewT, i: number) => (
+              <ReviewCard key={i} name={r.name} role={r.role} text={r.text} />
+            ))}
           </div>
         </div>
       </section>
@@ -363,7 +331,7 @@ function FeatureRow({
   text: string;
   bullets: string[];
   image: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   reverse?: boolean;
 }) {
   return (
@@ -392,22 +360,20 @@ function FeatureRow({
           ))}
         </ul>
       </div>
-      <div>
-        <div className="relative overflow-hidden rounded-3xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 shadow-2xl shadow-black/30">
-          <motion.img
-            src={image}
-            alt="Feature"
-            className="h-72 w-full object-cover sm:h-80"
-            initial={{ scale: 1.05 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
-        </div>
+      <div className="relative h-72 w-full overflow-hidden rounded-3xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 shadow-2xl shadow-black/30 sm:h-80">
+        <motion.img
+          src={image}
+          alt="Feature"
+          className="h-full w-full object-cover"
+          initial={{ scale: 1.05 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
       </div>
     </div>
   );
@@ -418,7 +384,7 @@ function MiniStat({
   label,
   value,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
 }) {
