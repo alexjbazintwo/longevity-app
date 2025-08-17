@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
   type ComponentType,
   type ReactNode,
@@ -20,9 +21,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useVertical } from "@/context/verticalContext";
-import type { ExtendedVerticalPack, IconName } from "@/types/vertical";
+import { useVertical } from "@/hooks/useVertical";
 
+type IconName = "HeartPulse" | "Trophy" | "Activity" | "Brain" | "LineChart";
 const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
   HeartPulse,
   Trophy,
@@ -30,21 +31,25 @@ const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
   Brain,
   LineChart,
 };
-
 function renderIcon(name: IconName, sizeClass: string) {
   const Cmp = iconMap[name] ?? Activity;
   return <Cmp className={sizeClass} />;
 }
 
 export default function Home() {
-  const { pack: rawPack } = useVertical();
-  const pack = rawPack as ExtendedVerticalPack;
-
+  const { pack } = useVertical();
   const [activeSlide, setActiveSlide] = useState(0);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
 
-  const attributionBySrc = pack.hero.credits ?? {};
-  const heroObjectPosition = pack.hero.objectPosition ?? {};
+  const attributionBySrc: Record<string, { label: string; href: string }> =
+    (
+      pack.hero as unknown as {
+        credits?: Record<string, { label: string; href: string }>;
+      }
+    ).credits ?? {};
+  const heroObjectPosition: Record<string, string> =
+    (pack.hero as unknown as { objectPosition?: Record<string, string> })
+      .objectPosition ?? {};
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -60,17 +65,15 @@ export default function Home() {
     return () => clearInterval(id);
   }, [pack.hero.slides, failed]);
 
+  const bubbles = useMemo(() => pack.outcomes.items, [pack.outcomes.items]);
   const currentSrc = pack.hero.slides[activeSlide];
   const credit = attributionBySrc[currentSrc];
 
   return (
-    <div className="relative min-h-screen text-white">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#0a1024] via-[#0a1024] to-black" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_12%_-8%,rgba(251,191,36,0.12),transparent_35%),radial-gradient(circle_at_85%_0%,rgba(56,189,248,0.12),transparent_38%)]" />
-
+    <div className="dark min-h-screen bg-background text-foreground">
       <section className="relative isolate">
         <div className="absolute inset-0 overflow-hidden">
-          {pack.hero.slides.map((src, i) => {
+          {pack.hero.slides.map((src: string, i: number) => {
             const hidden = failed[src];
             return (
               <motion.img
@@ -132,7 +135,7 @@ export default function Home() {
                 }`}
                 variant={cta.kind === "primary" ? "default" : "outline"}
               >
-                <Link to={cta.to}>
+                <Link to={cta.to === "/onboarding" ? "/setup" : cta.to}>
                   {cta.label}
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
@@ -142,16 +145,20 @@ export default function Home() {
 
           <div className="mt-8 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
             <p className="text-xs uppercase tracking-wider text-white/85">
-              Why AI beats templates
+              {pack.proof.title}
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {pack.proof.stats.map((s) => (
-                <ProofStat
+                <div
                   key={s.label}
-                  value={s.value}
-                  label={s.label}
-                  note={s.note}
-                />
+                  className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10"
+                >
+                  <div className="text-2xl font-semibold">{s.value}</div>
+                  <div className="text-sm text-white/85">{s.label}</div>
+                  {s.note && (
+                    <div className="text-[11px] text-white/75">{s.note}</div>
+                  )}
+                </div>
               ))}
             </div>
             <div className="mt-2 text-[11px] text-white/75">
@@ -178,7 +185,7 @@ export default function Home() {
             {pack.outcomes.title}
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {pack.outcomes.items.map((b) => (
+            {bubbles.map((b) => (
               <Card
                 key={b.label}
                 className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
@@ -233,7 +240,7 @@ export default function Home() {
               text={f.text}
               bullets={f.bullets}
               image={f.image}
-              icon={renderIcon(f.icon, "h-6 w-6")}
+              icon={renderIcon(f.icon as IconName, "h-6 w-6")}
               reverse={!!f.reverse}
             />
           ))}
@@ -272,9 +279,9 @@ export default function Home() {
             {pack.cta.smartAnalytics.stats.map((s, i) => (
               <MiniStat
                 key={i}
-                icon={renderIcon(s.icon, "h-4 w-4")}
                 label={s.label}
                 value={s.value}
+                icon={renderIcon(s.icon as IconName, "h-4 w-4")}
               />
             ))}
           </div>
@@ -293,24 +300,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </div>
-  );
-}
-
-function ProofStat({
-  value,
-  label,
-  note,
-}: {
-  value: string;
-  label: string;
-  note?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10">
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-sm text-white/85">{label}</div>
-      {note && <div className="text-[11px] text-white/75">{note}</div>}
     </div>
   );
 }

@@ -1,32 +1,33 @@
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import Header from "@/components/header";
-import Footer from "@/components/footer";
 import Home from "@/pages/home";
 import PlanSetup from "@/pages/planSetup";
 import PlanPreview from "@/pages/planPreview";
+import VerticalProvider from "@/context/VerticalProvider";
 
 function Layout() {
   return (
-    <div className="min-h-screen text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="bg-transparent">
+      <main>
         <Outlet />
       </main>
-      <Footer />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <VerticalProvider>
+      <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="setup" element={<PlanSetup />} />
-            <Route path="plan-preview" element={<PlanPreview />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/setup" element={<PlanSetup />} />
+            <Route path="/plan-preview" element={<PlanPreview />} />
           </Route>
         </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </VerticalProvider>
   );
 }

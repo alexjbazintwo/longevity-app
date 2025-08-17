@@ -19,9 +19,9 @@ import type {
   Question,
   FormData as LongevityFormData,
 } from "@/types/longevity/longevityForm";
-import { useSubmitForm } from "@/hooks/useSubmitForm";
-import { validateForm } from "@/hooks/useFormValidation";
-import { useResultContext } from "@/context/resultContext";
+import { useSubmitForm } from "@/hooks/longevity/useSubmitForm";
+import { validateForm } from "@/hooks/longevity/useFormValidation";
+import { useResultContext } from "@/context/longevity/resultContext";
 
 // Ensure TS understands the section shape
 type Section = { id: string; label: string; questions: Question[] };

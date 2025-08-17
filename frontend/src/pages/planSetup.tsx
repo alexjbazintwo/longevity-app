@@ -1,10 +1,16 @@
-// src/pages/planSetup.tsx — Option A (updated)
-import { useEffect, useMemo, useState, useCallback } from "react";
+// src/pages/planSetup.tsx
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  type ChangeEvent,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useVertical } from "@/context/verticalContext";
+import { useVertical } from "@/hooks/useVertical";
 import type { IntakeField, IntakeSchema } from "@/types/intake";
 
 type Answers = Record<string, string | number | string[]>;
@@ -18,10 +24,11 @@ const MOTIVES: { key: Motive; label: string; hint?: string }[] = [
   { key: "habit", label: "Habit", hint: "Consistency" },
 ];
 
-function isFilled(v: unknown) {
+function isFilled(v: unknown): boolean {
   if (v === undefined || v === null) return false;
   if (typeof v === "string") return v.trim() !== "";
   if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === "number") return !Number.isNaN(v);
   return true;
 }
 
@@ -30,11 +37,18 @@ function useLocalAnswers(key = "setupAnswers") {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(key);
-      if (saved) setAnswers(JSON.parse(saved));
-    } catch {}
+      if (saved) setAnswers(JSON.parse(saved) as Answers);
+    } catch (err) {
+      void err;
+      setAnswers({});
+    }
   }, [key]);
   useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(answers));
+    try {
+      localStorage.setItem(key, JSON.stringify(answers));
+    } catch (err) {
+      void err;
+    }
   }, [key, answers]);
   return { answers, setAnswers };
 }
@@ -132,17 +146,17 @@ function MultiSelectChips({
   value: string[] | undefined;
   onChange: (v: string[]) => void;
 }) {
-  const set = new Set(value ?? []);
-  function toggle(k: string) {
-    const next = new Set(set);
-    if (next.has(k)) next.delete(k);
-    else next.add(k);
+  const selected = new Set(value ?? []);
+  function toggle(key: string) {
+    const next = new Set(selected);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
     onChange(Array.from(next));
   }
   return (
     <div className="flex flex-wrap gap-2">
       {field.options.map((opt) => {
-        const active = set.has(opt.key);
+        const active = selected.has(opt.key);
         return (
           <button
             key={opt.key}
@@ -173,8 +187,11 @@ function HoursSlider({
   onChange: (v: number) => void;
 }) {
   const v =
-    typeof value === "number" && !Number.isNaN(value) ? value : field.min; // default to min (0)
+    typeof value === "number" && !Number.isNaN(value) ? value : field.min;
   const pct = ((v - field.min) / (field.max - field.min)) * 100;
+  function onInput(e: ChangeEvent<HTMLInputElement>) {
+    onChange(Number(e.target.value));
+  }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-white/70">
@@ -193,7 +210,7 @@ function HoursSlider({
           max={field.max}
           step={1}
           value={v}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={onInput}
           className="absolute inset-0 h-2 w-full appearance-none bg-transparent"
         />
       </div>
@@ -211,6 +228,10 @@ function NumberInput({
   value: number | undefined;
   onChange: (v: number) => void;
 }) {
+  function onChangeInput(e: ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    onChange(raw === "" ? Number.NaN : Number(raw));
+  }
   return (
     <input
       type="number"
@@ -218,9 +239,7 @@ function NumberInput({
       max={field.max}
       step={field.step ?? 1}
       value={value ?? ""}
-      onChange={(e) =>
-        onChange(e.target.value === "" ? NaN : Number(e.target.value))
-      }
+      onChange={onChangeInput}
       className="w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
       placeholder={field.placeholder ?? ""}
     />
@@ -236,12 +255,15 @@ function TextInput({
   value: string | undefined;
   onChange: (v: string) => void;
 }) {
+  function onChangeInput(e: ChangeEvent<HTMLInputElement>) {
+    onChange(e.target.value);
+  }
   return (
     <input
       type="text"
       placeholder={field.placeholder ?? ""}
       value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChangeInput}
       className="w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
     />
   );
@@ -256,7 +278,7 @@ function Field({
   value: string | number | string[] | undefined;
   onChange: (v: string | number | string[]) => void;
 }) {
-  if (field.type === "singleChoice")
+  if (field.type === "singleChoice") {
     return (
       <ChoiceTiles
         field={field}
@@ -264,7 +286,8 @@ function Field({
         onChange={(v) => onChange(v)}
       />
     );
-  if (field.type === "multiSelect")
+  }
+  if (field.type === "multiSelect") {
     return (
       <MultiSelectChips
         field={field}
@@ -272,15 +295,17 @@ function Field({
         onChange={(v) => onChange(v)}
       />
     );
-  if (field.type === "hoursPerWeek")
+  }
+  if (field.type === "hoursPerWeek") {
     return (
       <HoursSlider
         field={field}
         value={value as number | undefined}
-        onChange={(v) => onChange(v as number)}
+        onChange={(v) => onChange(v)}
       />
     );
-  if (field.type === "number")
+  }
+  if (field.type === "number") {
     return (
       <NumberInput
         field={field}
@@ -288,9 +313,10 @@ function Field({
         onChange={(v) => onChange(v)}
       />
     );
+  }
   return (
     <TextInput
-      field={field as any}
+      field={field as Extract<IntakeField, { type: "text" }>}
       value={value as string | undefined}
       onChange={(v) => onChange(v)}
     />
@@ -310,68 +336,62 @@ export default function PlanSetup() {
     Array.isArray(answers.motives) ? (answers.motives as Motive[]) : []
   );
   const [priority, setPriority] = useState<Motive | "">(
-    (answers.priority as Motive) || ""
+    ((answers.priority as Motive) ?? "") as Motive | ""
   );
 
   const raceSection = useMemo(
-    () =>
-      schema.find((s) =>
-        s.fields.some((f) => (f as any).id === "raceDistance")
-      ),
+    () => schema.find((s) => s.fields.some((f) => f.id === "raceDistance")),
     [schema]
   );
   const distanceSection = useMemo(
-    () =>
-      schema.find((s) =>
-        s.fields.some((f) => (f as any).id === "distanceGoal")
-      ),
+    () => schema.find((s) => s.fields.some((f) => f.id === "distanceGoal")),
     [schema]
   );
   const healthSection = useMemo(
-    () =>
-      schema.find((s) => s.fields.some((f) => (f as any).id === "healthFocus")),
+    () => schema.find((s) => s.fields.some((f) => f.id === "healthFocus")),
     [schema]
   );
   const comebackSection = useMemo(
-    () =>
-      schema.find((s) =>
-        s.fields.some((f) => (f as any).id === "physioCleared")
-      ),
+    () => schema.find((s) => s.fields.some((f) => f.id === "physioCleared")),
     [schema]
   );
   const timeLoadSection = useMemo(
     () =>
       schema.find((s) =>
-        s.fields.some((f) =>
-          ["hours", "currentMileage"].includes((f as any).id)
-        )
+        s.fields.some((f) => f.id === "hours" || f.id === "currentMileage")
       ),
     [schema]
   );
   const prefsSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => (f as any).id === "surface")),
+    () => schema.find((s) => s.fields.some((f) => f.id === "surface")),
     [schema]
   );
   const styleSection = useMemo(
-    () =>
-      schema.find((s) =>
-        s.fields.some((f) => (f as any).id === "coachingStyle")
-      ),
+    () => schema.find((s) => s.fields.some((f) => f.id === "coachingStyle")),
     [schema]
   );
 
   const followUps = useMemo(() => {
     const mset = new Set(motives);
-    const map: Record<Motive, typeof raceSection | undefined> = {
+    const map: Record<
+      Motive,
+      | typeof raceSection
+      | typeof distanceSection
+      | typeof healthSection
+      | typeof comebackSection
+      | typeof styleSection
+      | undefined
+    > = {
       race: raceSection,
       distance: distanceSection,
       health: healthSection,
       comeback: comebackSection,
       habit: styleSection,
     };
+
     const ordered: (typeof raceSection)[] = [];
     if (priority && mset.has(priority)) {
-      const sec = map[priority as Motive];
+      const sec = map[priority];
       if (sec) ordered.push(sec);
     }
     for (const m of motives) {
@@ -396,7 +416,6 @@ export default function PlanSetup() {
 
   const [step, setStep] = useState(0);
 
-  // Skip priority step if only one motive is selected
   useEffect(() => {
     if (step === 1 && motives.length === 1) {
       const only = motives[0];
@@ -405,9 +424,9 @@ export default function PlanSetup() {
     }
   }, [step, motives, priority]);
 
-  const stepsBeforeFollowups = motives.length > 1 ? 2 : 1; // motives + maybe priority
+  const stepsBeforeFollowups = motives.length > 1 ? 2 : 1;
   const total = stepsBeforeFollowups + followUps.length;
-  const progressPct = Math.round(((step + 1) / total) * 100);
+  const progressPct = Math.round(((step + 1) / Math.max(total, 1)) * 100);
 
   const canNext = useMemo(() => {
     if (step === 0) return motives.length > 0;
@@ -415,9 +434,8 @@ export default function PlanSetup() {
     const sec = followUps[step - stepsBeforeFollowups];
     if (!sec) return true;
     for (const f of sec.fields) {
-      const id = (f as any).id as string;
-      const required = "required" in f && !!(f as any).required;
-      if (required && !isFilled(answers[id])) return false; // optional never blocks
+      const required = Boolean(f.required);
+      if (required && !isFilled(answers[f.id])) return false;
     }
     return true;
   }, [
@@ -444,8 +462,6 @@ export default function PlanSetup() {
 
   const currentSec =
     step < stepsBeforeFollowups ? null : followUps[step - stepsBeforeFollowups];
-
-  // helper to read units for the mileage label
   const units = (answers["units"] as string) || "km";
 
   return (
@@ -601,57 +617,56 @@ export default function PlanSetup() {
                   </div>
                 )}
 
-                {step >= stepsBeforeFollowups && step < total && currentSec && (
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">
-                      {currentSec.title}
-                    </h2>
-                    <p className="mt-1 text-white/80">{currentSec.subtitle}</p>
-                    <div className="mt-6 grid gap-5">
-                      {currentSec.fields.map((f) => {
-                        const id = (f as any).id as string;
-                        const required =
-                          "required" in f && !!(f as any).required;
-                        const val = answers[id] as
-                          | string
-                          | number
-                          | string[]
-                          | undefined;
-                        const isMileage = id === "currentMileage";
-                        return (
-                          <div key={id} className="space-y-2">
-                            <div className="flex items-baseline justify-between">
-                              <label className="text-sm font-medium text-white">
-                                {(f as any).label}
-                                {isMileage ? ` (${units})` : ""}
-                                {required ? " *" : ""}
-                              </label>
-                              {"placeholder" in f && (f as any).placeholder ? (
-                                <span className="text-[11px] text-white/60">
-                                  {(f as any).placeholder}
-                                </span>
-                              ) : null}
+                {step >= (motives.length > 1 ? 2 : 1) &&
+                  step < total &&
+                  currentSec && (
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">
+                        {currentSec.title}
+                      </h2>
+                      <p className="mt-1 text-white/80">
+                        {currentSec.subtitle}
+                      </p>
+                      <div className="mt-6 grid gap-5">
+                        {currentSec.fields.map((f) => {
+                          const id = f.id;
+                          const required = Boolean(f.required);
+                          const val = answers[id];
+                          const isMileage = id === "currentMileage";
+                          return (
+                            <div key={id} className="space-y-2">
+                              <div className="flex items-baseline justify-between">
+                                <label className="text-sm font-medium text-white">
+                                  {f.label}
+                                  {isMileage ? ` (${units})` : ""}
+                                  {required ? " *" : ""}
+                                </label>
+                                {"placeholder" in f && f.placeholder ? (
+                                  <span className="text-[11px] text-white/60">
+                                    {f.placeholder}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <Field
+                                field={f}
+                                value={val}
+                                onChange={(v) =>
+                                  setAnswers((a) => ({ ...a, [id]: v }))
+                                }
+                              />
                             </div>
-                            <Field
-                              field={f}
-                              value={val}
-                              onChange={(v) =>
-                                setAnswers((a) => ({ ...a, [id]: v }))
-                              }
-                            />
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </motion.div>
             </AnimatePresence>
 
             <div className="mt-10 flex items-center justify-between">
               <Button
                 variant="outline"
-                className="rounded-xl border-white/20 bg-white/5 text-white hover:bg-white/10"
+                className="rounded-xl border-white/20 bg白/5 text-white hover:bg-white/10"
                 onClick={goBack}
                 disabled={step === 0}
               >
