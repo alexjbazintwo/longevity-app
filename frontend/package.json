@@ -9,7 +9,8 @@
     "build:hybrid": "vite build --mode hybrid",
     "build:masters": "vite build --mode masters",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "change": "fkfk"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
