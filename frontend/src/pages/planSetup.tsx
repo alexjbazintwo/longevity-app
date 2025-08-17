@@ -1,25 +1,29 @@
-// src/pages/planSetup.tsx
-import {
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-  type ChangeEvent,
-} from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useVertical } from "@/hooks/useVertical";
-import type { IntakeField, IntakeSchema } from "@/types/intake";
+import type {
+  IntakeField,
+  IntakeSchema,
+  DateField,
+  TimeHMSField,
+  NumberField,
+  HoursPerWeekField,
+  SingleChoiceField,
+  MultiSelectField,
+  TextField,
+  IntakeSection,
+} from "@/types/intake";
 
 type Answers = Record<string, string | number | string[]>;
 type Motive = "race" | "distance" | "health" | "comeback" | "habit";
 
 const MOTIVES: { key: Motive; label: string; hint?: string }[] = [
   { key: "race", label: "Race", hint: "Specific event" },
-  { key: "distance", label: "Distance", hint: "Not a race" },
-  { key: "health", label: "Health", hint: "Capacity, energy, resilience" },
+  { key: "distance", label: "Distance", hint: "Build to a target distance" },
+  { key: "health", label: "Health", hint: "Energy, cardio, metabolic" },
   { key: "comeback", label: "Comeback", hint: "After time off or niggle" },
   { key: "habit", label: "Habit", hint: "Consistency" },
 ];
@@ -38,16 +42,15 @@ function useLocalAnswers(key = "setupAnswers") {
     try {
       const saved = localStorage.getItem(key);
       if (saved) setAnswers(JSON.parse(saved) as Answers);
-    } catch (err) {
-      void err;
+    } catch {
       setAnswers({});
     }
   }, [key]);
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(answers));
-    } catch (err) {
-      void err;
+    } catch {
+      /* ignore */
     }
   }, [key, answers]);
   return { answers, setAnswers };
@@ -74,14 +77,33 @@ function Pill({
   );
 }
 
-/* ---------- Field Renderers ---------- */
+function parseHMS(s: string): { h: string; m: string; sec: string } {
+  const parts = s.split(":");
+  if (parts.length === 3)
+    return { h: parts[0] ?? "", m: parts[1] ?? "", sec: parts[2] ?? "" };
+  if (parts.length === 2)
+    return { h: "0", m: parts[0] ?? "", sec: parts[1] ?? "" };
+  return { h: "", m: "", sec: "" };
+}
+
+function toHMS(h: string, m: string, sec: string): string {
+  const hh = String(Math.max(0, Number(h) || 0));
+  const mm = String(Math.max(0, Math.min(59, Number(m) || 0))).padStart(2, "0");
+  const ss = String(Math.max(0, Math.min(59, Number(sec) || 0))).padStart(
+    2,
+    "0"
+  );
+  return `${hh}:${mm}:${ss}`;
+}
+
+/* ---------- Field Renderers (crisp selection, no blur) ---------- */
 
 function ChoiceTiles({
   field,
   value,
   onChange,
 }: {
-  field: Extract<IntakeField, { type: "singleChoice" }>;
+  field: SingleChoiceField;
   value: string | number | undefined;
   onChange: (v: string) => void;
 }) {
@@ -95,7 +117,9 @@ function ChoiceTiles({
             className={[
               "relative cursor-pointer rounded-2xl px-4 py-4 transition",
               "ring-1 ring-white/20 bg-white/10 hover:bg-white/15",
-              active ? "ring-emerald-300/60 bg-white/15" : "",
+              active
+                ? "ring-indigo-300/60 shadow-[0_0_0_2px_rgba(99,102,241,0.35)]"
+                : "",
               "focus-within:ring-2 focus-within:ring-indigo-300/60",
             ].join(" ")}
           >
@@ -106,17 +130,6 @@ function ChoiceTiles({
               className="sr-only"
               checked={active}
               onChange={() => onChange(opt.key)}
-            />
-            <span
-              aria-hidden
-              className={[
-                "pointer-events-none absolute -inset-[2px] rounded-[1.25rem] opacity-0 blur transition-opacity duration-300",
-                active ? "opacity-100" : "focus-within:opacity-100",
-              ].join(" ")}
-              style={{
-                background:
-                  "linear-gradient(90deg, rgba(251,191,36,0.45), rgba(56,189,248,0.45), rgba(16,185,129,0.45))",
-              }}
             />
             <div className="relative z-10 flex items-center justify-between">
               <div className="text-sm font-semibold text-white">
@@ -142,21 +155,21 @@ function MultiSelectChips({
   value,
   onChange,
 }: {
-  field: Extract<IntakeField, { type: "multiSelect" }>;
+  field: MultiSelectField;
   value: string[] | undefined;
   onChange: (v: string[]) => void;
 }) {
-  const selected = new Set(value ?? []);
-  function toggle(key: string) {
-    const next = new Set(selected);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
+  const set = new Set(value ?? []);
+  function toggle(k: string) {
+    const next = new Set(set);
+    if (next.has(k)) next.delete(k);
+    else next.add(k);
     onChange(Array.from(next));
   }
   return (
     <div className="flex flex-wrap gap-2">
       {field.options.map((opt) => {
-        const active = selected.has(opt.key);
+        const active = set.has(opt.key);
         return (
           <button
             key={opt.key}
@@ -182,16 +195,13 @@ function HoursSlider({
   value,
   onChange,
 }: {
-  field: Extract<IntakeField, { type: "hoursPerWeek" }>;
+  field: HoursPerWeekField;
   value: number | undefined;
   onChange: (v: number) => void;
 }) {
   const v =
     typeof value === "number" && !Number.isNaN(value) ? value : field.min;
   const pct = ((v - field.min) / (field.max - field.min)) * 100;
-  function onInput(e: ChangeEvent<HTMLInputElement>) {
-    onChange(Number(e.target.value));
-  }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-white/70">
@@ -210,7 +220,7 @@ function HoursSlider({
           max={field.max}
           step={1}
           value={v}
-          onChange={onInput}
+          onChange={(e) => onChange(Number(e.target.value))}
           className="absolute inset-0 h-2 w-full appearance-none bg-transparent"
         />
       </div>
@@ -224,23 +234,32 @@ function NumberInput({
   value,
   onChange,
 }: {
-  field: Extract<IntakeField, { type: "number" }>;
+  field: NumberField;
   value: number | undefined;
   onChange: (v: number) => void;
 }) {
-  function onChangeInput(e: ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
-    onChange(raw === "" ? Number.NaN : Number(raw));
+  const display =
+    value === undefined || Number.isNaN(value) ? "" : String(value);
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.trim();
+    if (raw === "") {
+      onChange(Number.NaN);
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isNaN(n)) onChange(n);
   }
   return (
     <input
-      type="number"
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
       min={field.min}
       max={field.max}
-      step={field.step ?? 1}
-      value={value ?? ""}
-      onChange={onChangeInput}
-      className="w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
+      aria-label={field.label}
+      value={display}
+      onChange={handleChange}
+      className="w-full appearance-none rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
       placeholder={field.placeholder ?? ""}
     />
   );
@@ -251,21 +270,96 @@ function TextInput({
   value,
   onChange,
 }: {
-  field: Extract<IntakeField, { type: "text" }>;
+  field: TextField;
   value: string | undefined;
   onChange: (v: string) => void;
 }) {
-  function onChangeInput(e: ChangeEvent<HTMLInputElement>) {
-    onChange(e.target.value);
-  }
   return (
     <input
       type="text"
       placeholder={field.placeholder ?? ""}
       value={value ?? ""}
-      onChange={onChangeInput}
+      onChange={(e) => onChange(e.target.value)}
       className="w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
     />
+  );
+}
+
+function DateInput({
+  value,
+  onChange,
+  minISO,
+}: {
+  field: DateField;
+  value: string | undefined;
+  onChange: (v: string) => void;
+  minISO?: string;
+}) {
+  return (
+    <input
+      type="date"
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+      min={minISO}
+      className="w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white outline-none focus:border-indigo-400/40"
+    />
+  );
+}
+
+function TimeHMSInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: TimeHMSField;
+  value: string | undefined;
+  onChange: (v: string) => void;
+}) {
+  const { h, m, sec } = parseHMS(value ?? "");
+  function onH(e: React.ChangeEvent<HTMLInputElement>) {
+    onChange(toHMS(e.target.value, m, sec));
+  }
+  function onM(e: React.ChangeEvent<HTMLInputElement>) {
+    onChange(toHMS(h, e.target.value, sec));
+  }
+  function onS(e: React.ChangeEvent<HTMLInputElement>) {
+    onChange(toHMS(h, m, e.target.value));
+  }
+  const box =
+    "w-full rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40";
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        placeholder="HH"
+        value={h}
+        onChange={onH}
+        className={box}
+        aria-label={`${field.label} hours`}
+      />
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        placeholder="MM"
+        value={m}
+        onChange={onM}
+        className={box}
+        aria-label={`${field.label} minutes`}
+      />
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        placeholder="SS"
+        value={sec}
+        onChange={onS}
+        className={box}
+        aria-label={`${field.label} seconds`}
+      />
+    </div>
   );
 }
 
@@ -273,57 +367,82 @@ function Field({
   field,
   value,
   onChange,
+  minISO,
 }: {
   field: IntakeField;
   value: string | number | string[] | undefined;
   onChange: (v: string | number | string[]) => void;
+  minISO?: string;
 }) {
-  if (field.type === "singleChoice") {
-    return (
-      <ChoiceTiles
-        field={field}
-        value={value as string | number | undefined}
-        onChange={(v) => onChange(v)}
-      />
-    );
+  switch (field.type) {
+    case "singleChoice":
+      return (
+        <ChoiceTiles
+          field={field}
+          value={value as string | number | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case "multiSelect":
+      return (
+        <MultiSelectChips
+          field={field}
+          value={value as string[] | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case "hoursPerWeek":
+      return (
+        <HoursSlider
+          field={field}
+          value={value as number | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case "number":
+      return (
+        <NumberInput
+          field={field}
+          value={value as number | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case "text":
+      return (
+        <TextInput
+          field={field}
+          value={value as string | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    case "date":
+      return (
+        <DateInput
+          field={field}
+          value={value as string | undefined}
+          onChange={(v) => onChange(v)}
+          minISO={minISO}
+        />
+      );
+    case "timeHMS":
+      return (
+        <TimeHMSInput
+          field={field}
+          value={value as string | undefined}
+          onChange={(v) => onChange(v)}
+        />
+      );
+    default:
+      return null;
   }
-  if (field.type === "multiSelect") {
-    return (
-      <MultiSelectChips
-        field={field}
-        value={value as string[] | undefined}
-        onChange={(v) => onChange(v)}
-      />
-    );
-  }
-  if (field.type === "hoursPerWeek") {
-    return (
-      <HoursSlider
-        field={field}
-        value={value as number | undefined}
-        onChange={(v) => onChange(v)}
-      />
-    );
-  }
-  if (field.type === "number") {
-    return (
-      <NumberInput
-        field={field}
-        value={value as number | undefined}
-        onChange={(v) => onChange(v)}
-      />
-    );
-  }
-  return (
-    <TextInput
-      field={field as Extract<IntakeField, { type: "text" }>}
-      value={value as string | undefined}
-      onChange={(v) => onChange(v)}
-    />
-  );
 }
 
-/* ---------- Page ---------- */
+/* ---------- Stage builder ---------- */
+
+type Stage =
+  | { kind: "motives" }
+  | { kind: "priority" }
+  | { kind: "section"; section: IntakeSection };
 
 export default function PlanSetup() {
   const navigate = useNavigate();
@@ -336,52 +455,32 @@ export default function PlanSetup() {
     Array.isArray(answers.motives) ? (answers.motives as Motive[]) : []
   );
   const [priority, setPriority] = useState<Motive | "">(
-    ((answers.priority as Motive) ?? "") as Motive | ""
+    (answers.priority as Motive) || ""
+  );
+  const [step, setStep] = useState(0);
+  const [showSecondEvent, setShowSecondEvent] = useState<boolean>(
+    Boolean(answers["race2Distance"] || answers["race2Date"])
   );
 
-  const raceSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "raceDistance")),
-    [schema]
-  );
-  const distanceSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "distanceGoal")),
-    [schema]
-  );
-  const healthSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "healthFocus")),
-    [schema]
-  );
-  const comebackSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "physioCleared")),
-    [schema]
-  );
-  const timeLoadSection = useMemo(
-    () =>
-      schema.find((s) =>
-        s.fields.some((f) => f.id === "hours" || f.id === "currentMileage")
-      ),
-    [schema]
-  );
-  const prefsSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "surface")),
-    [schema]
-  );
-  const styleSection = useMemo(
-    () => schema.find((s) => s.fields.some((f) => f.id === "coachingStyle")),
-    [schema]
-  );
+  const sById = useMemo(() => {
+    const map = new Map<string, IntakeSection>();
+    schema.forEach((s) => s.fields.forEach((f) => map.set(f.id, s)));
+    return map;
+  }, [schema]);
 
-  const followUps = useMemo(() => {
-    const mset = new Set(motives);
-    const map: Record<
-      Motive,
-      | typeof raceSection
-      | typeof distanceSection
-      | typeof healthSection
-      | typeof comebackSection
-      | typeof styleSection
-      | undefined
-    > = {
+  const raceSection = sById.get("raceDistance");
+  const distanceSection = sById.get("distanceGoal");
+  const healthSection = sById.get("healthFocus");
+  const comebackSection = sById.get("physioCleared");
+  const styleSection = sById.get("coachingStyle");
+  const timeLoadSection = sById.get("hours") ?? sById.get("currentMileage");
+  const prefsSection = sById.get("surface");
+
+  const stages = useMemo<Stage[]>(() => {
+    const out: Stage[] = [{ kind: "motives" }];
+    if (motives.length > 1) out.push({ kind: "priority" });
+
+    const map: Record<Motive, IntakeSection | undefined> = {
       race: raceSection,
       distance: distanceSection,
       health: healthSection,
@@ -389,19 +488,24 @@ export default function PlanSetup() {
       habit: styleSection,
     };
 
-    const ordered: (typeof raceSection)[] = [];
-    if (priority && mset.has(priority)) {
-      const sec = map[priority];
-      if (sec) ordered.push(sec);
-    }
-    for (const m of motives) {
-      if (m === priority) continue;
+    const orderedMotives: Motive[] =
+      priority && motives.includes(priority)
+        ? [priority, ...motives.filter((m) => m !== priority)]
+        : motives.slice();
+
+    for (const m of orderedMotives) {
       const sec = map[m];
-      if (sec && !ordered.includes(sec)) ordered.push(sec);
+      if (sec) out.push({ kind: "section", section: sec });
     }
-    if (timeLoadSection) ordered.push(timeLoadSection);
-    if (prefsSection) ordered.push(prefsSection);
-    return ordered.filter(Boolean) as NonNullable<typeof raceSection>[];
+
+    if (timeLoadSection)
+      out.push({ kind: "section", section: timeLoadSection });
+    if (prefsSection) out.push({ kind: "section", section: prefsSection });
+    if (styleSection && !orderedMotives.includes("habit")) {
+      out.push({ kind: "section", section: styleSection });
+    }
+
+    return out;
   }, [
     motives,
     priority,
@@ -409,42 +513,59 @@ export default function PlanSetup() {
     distanceSection,
     healthSection,
     comebackSection,
-    styleSection,
     timeLoadSection,
     prefsSection,
+    styleSection,
   ]);
 
-  const [step, setStep] = useState(0);
+  useEffect(() => {
+    setStep((s) => (s >= stages.length ? Math.max(0, stages.length - 1) : s));
+  }, [stages.length]);
 
   useEffect(() => {
-    if (step === 1 && motives.length === 1) {
-      const only = motives[0];
-      if (priority !== only) setPriority(only);
-      setStep(2);
-    }
-  }, [step, motives, priority]);
+    setAnswers((a) => ({ ...a, motives, priority }));
+  }, [motives, priority, setAnswers]);
 
-  const stepsBeforeFollowups = motives.length > 1 ? 2 : 1;
-  const total = stepsBeforeFollowups + followUps.length;
-  const progressPct = Math.round(((step + 1) / Math.max(total, 1)) * 100);
+  const firstDetailsIndex = useMemo(
+    () => stages.findIndex((st) => st.kind === "section"),
+    [stages]
+  );
+  const total = stages.length;
+  const progressPct = total > 0 ? Math.round(((step + 1) / total) * 100) : 0;
 
   const canNext = useMemo(() => {
-    if (step === 0) return motives.length > 0;
-    if (motives.length > 1 && step === 1) return priority !== "";
-    const sec = followUps[step - stepsBeforeFollowups];
-    if (!sec) return true;
-    for (const f of sec.fields) {
-      const required = Boolean(f.required);
-      if (required && !isFilled(answers[f.id])) return false;
+    const st = stages[step];
+    if (!st) return false;
+
+    if (st.kind === "motives") return motives.length > 0;
+    if (st.kind === "priority") return priority !== "";
+
+    if (st.kind === "section") {
+      for (const f of st.section.fields) {
+        if (f.required && !isFilled(answers[f.id])) return false;
+      }
+      if (st.section === raceSection && showSecondEvent) {
+        const mustHave = [
+          "race2Distance",
+          "race2Date",
+          "currentFitnessTime2",
+        ] as const;
+        for (const k of mustHave) {
+          const v = answers[k as string];
+          if (!isFilled(v)) return false;
+        }
+      }
+      return true;
     }
-    return true;
+    return false;
   }, [
+    stages,
     step,
     motives.length,
     priority,
-    followUps,
-    stepsBeforeFollowups,
     answers,
+    raceSection,
+    showSecondEvent,
   ]);
 
   const goNext = useCallback(() => {
@@ -456,13 +577,71 @@ export default function PlanSetup() {
     if (step > 0) setStep((s) => s - 1);
   }, [step]);
 
-  useEffect(() => {
-    setAnswers((a) => ({ ...a, motives, priority }));
-  }, [motives, priority, setAnswers]);
+  const current = stages[step];
+  const units = useMemo(() => (answers["units"] as string) || "km", [answers]);
 
-  const currentSec =
-    step < stepsBeforeFollowups ? null : followUps[step - stepsBeforeFollowups];
-  const units = (answers["units"] as string) || "km";
+  function todayISO(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function weeksUntil(dateISO: string): number | null {
+    if (!dateISO) return null;
+    const now = new Date();
+    const race = new Date(dateISO);
+    const ms = race.getTime() - now.getTime();
+    const weeks = ms / (1000 * 60 * 60 * 24 * 7);
+    return Number.isFinite(weeks) ? Math.max(0, Math.round(weeks)) : null;
+  }
+
+  function event2FieldsFromRace(race: IntakeSection): IntakeField[] {
+    const suffix = "2";
+    return race.fields
+      .filter((f) =>
+        [
+          "raceDistance",
+          "raceDate",
+          "currentFitnessTime",
+          "targetTime",
+          "courseProfile",
+        ].includes(f.id)
+      )
+      .map((f) => {
+        const clone: IntakeField = {
+          ...f,
+          id: `${f.id}${suffix}`,
+        } as IntakeField;
+        if (clone.id === `currentFitnessTime${suffix}`) {
+          (clone as TimeHMSField).label =
+            "If you raced this distance today, what time would you run? (estimate if unsure)";
+          (clone as TimeHMSField).required = true;
+        }
+        if (clone.id === `targetTime${suffix}`) {
+          (clone as TimeHMSField).label = "Target finish time";
+          (clone as TimeHMSField).required = false;
+        }
+        if (clone.id === `raceDate${suffix}`) {
+          (clone as DateField).label = "Race date";
+          (clone as DateField).required = true;
+        }
+        if (clone.id === `raceDistance${suffix}`) {
+          (clone as SingleChoiceField).label = "Event distance";
+          (clone as SingleChoiceField).required = true;
+        }
+        if (clone.id === `courseProfile${suffix}`) {
+          (clone as SingleChoiceField).label = "Course profile";
+          (clone as SingleChoiceField).required = false;
+        }
+        return clone;
+      });
+  }
+
+  const onToggleSecondEvent = useCallback(() => {
+    setShowSecondEvent((v) => !v);
+  }, []);
 
   return (
     <div className="relative min-h-[calc(100vh-64px)]">
@@ -474,8 +653,14 @@ export default function PlanSetup() {
           <div className="flex items-center justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <Pill active={step >= 0}>Motives</Pill>
-              {motives.length > 1 && <Pill active={step >= 1}>Priority</Pill>}
-              <Pill active={step >= stepsBeforeFollowups}>Details</Pill>
+              {stages.some((s) => s.kind === "priority") && (
+                <Pill active={step >= 1}>Priority</Pill>
+              )}
+              <Pill
+                active={firstDetailsIndex !== -1 && step >= firstDetailsIndex}
+              >
+                Details
+              </Pill>
               <Pill active={step >= total - 1}>Finish</Pill>
             </div>
             <div className="w-48">
@@ -502,7 +687,7 @@ export default function PlanSetup() {
                 transition={{ duration: 0.35 }}
                 className="space-y-8"
               >
-                {step === 0 && (
+                {current?.kind === "motives" && (
                   <div>
                     <h1 className="text-2xl font-semibold text-white sm:text-3xl">
                       What brings you to Runzi?
@@ -528,21 +713,12 @@ export default function PlanSetup() {
                             className={[
                               "relative rounded-2xl px-4 py-4 text-left transition",
                               "ring-1 ring-white/20 bg-white/10 hover:bg-white/15",
-                              active ? "ring-emerald-300/60 bg-white/15" : "",
+                              active
+                                ? "ring-indigo-300/60 shadow-[0_0_0_2px_rgba(99,102,241,0.35)]"
+                                : "",
                               "focus:outline-none focus:ring-2 focus:ring-indigo-300/60",
                             ].join(" ")}
                           >
-                            <span
-                              aria-hidden
-                              className={[
-                                "pointer-events-none absolute -inset-[2px] rounded-[1.25rem] opacity-0 blur transition-opacity duration-300",
-                                active ? "opacity-100" : "",
-                              ].join(" ")}
-                              style={{
-                                background:
-                                  "linear-gradient(90deg, rgba(251,191,36,0.45), rgba(56,189,248,0.45), rgba(16,185,129,0.45))",
-                              }}
-                            />
                             <div className="relative z-10">
                               <div className="text-sm font-semibold text-white">
                                 {m.label}
@@ -560,7 +736,7 @@ export default function PlanSetup() {
                   </div>
                 )}
 
-                {motives.length > 1 && step === 1 && (
+                {current?.kind === "priority" && (
                   <div>
                     <h2 className="text-2xl font-semibold text-white sm:text-3xl">
                       What’s your top priority?
@@ -578,7 +754,9 @@ export default function PlanSetup() {
                             className={[
                               "relative cursor-pointer rounded-2xl px-4 py-4 transition",
                               "ring-1 ring-white/20 bg-white/10 hover:bg-white/15",
-                              active ? "ring-emerald-300/60 bg-white/15" : "",
+                              active
+                                ? "ring-indigo-300/60 shadow-[0_0_0_2px_rgba(99,102,241,0.35)]"
+                                : "",
                               "focus-within:ring-2 focus-within:ring-indigo-300/60",
                             ].join(" ")}
                           >
@@ -588,17 +766,6 @@ export default function PlanSetup() {
                               className="sr-only"
                               checked={active}
                               onChange={() => setPriority(m)}
-                            />
-                            <span
-                              aria-hidden
-                              className={[
-                                "pointer-events-none absolute -inset-[2px] rounded-[1.25rem] opacity-0 blur transition-opacity duration-300",
-                                active ? "opacity-100" : "",
-                              ].join(" ")}
-                              style={{
-                                background:
-                                  "linear-gradient(90deg, rgba(251,191,36,0.45), rgba(56,189,248,0.45), rgba(16,185,129,0.45))",
-                              }}
                             />
                             <div className="relative z-10">
                               <div className="text-sm font-semibold text-white">
@@ -617,56 +784,153 @@ export default function PlanSetup() {
                   </div>
                 )}
 
-                {step >= (motives.length > 1 ? 2 : 1) &&
-                  step < total &&
-                  currentSec && (
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">
-                        {currentSec.title}
-                      </h2>
-                      <p className="mt-1 text-white/80">
-                        {currentSec.subtitle}
-                      </p>
-                      <div className="mt-6 grid gap-5">
-                        {currentSec.fields.map((f) => {
-                          const id = f.id;
-                          const required = Boolean(f.required);
-                          const val = answers[id];
-                          const isMileage = id === "currentMileage";
-                          return (
-                            <div key={id} className="space-y-2">
-                              <div className="flex items-baseline justify-between">
-                                <label className="text-sm font-medium text-white">
-                                  {f.label}
-                                  {isMileage ? ` (${units})` : ""}
-                                  {required ? " *" : ""}
-                                </label>
-                                {"placeholder" in f && f.placeholder ? (
-                                  <span className="text-[11px] text-white/60">
-                                    {f.placeholder}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <Field
-                                field={f}
-                                value={val}
-                                onChange={(v) =>
-                                  setAnswers((a) => ({ ...a, [id]: v }))
-                                }
-                              />
+                {current?.kind === "section" && (
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">
+                      {current.section.title}
+                    </h2>
+                    <p className="mt-1 text-white/80">
+                      {current.section.subtitle}
+                    </p>
+                    <div className="mt-6 grid gap-5">
+                      {current.section.fields.map((f) => {
+                        const id = f.id;
+                        const required = Boolean(f.required);
+                        const val = answers[id];
+
+                        const labelSuffix =
+                          id === "currentMileage" ||
+                          id === "longestRun" ||
+                          id === "currentLongest"
+                            ? ` (${units})`
+                            : id === "comfortablePace"
+                            ? ` (per ${units === "mi" ? "mile" : "km"})`
+                            : "";
+
+                        return (
+                          <div key={id} className="space-y-2">
+                            <div className="flex items-baseline justify-between">
+                              <label className="text-sm font-medium text-white">
+                                {f.label}
+                                {labelSuffix}
+                                {required ? " *" : " (optional)"}
+                              </label>
+                              {"placeholder" in f && f.placeholder ? (
+                                <span className="text-[11px] text-white/60">
+                                  {f.placeholder}
+                                </span>
+                              ) : null}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <Field
+                              field={f}
+                              value={val}
+                              onChange={(v) =>
+                                setAnswers((a) => ({ ...a, [id]: v }))
+                              }
+                              minISO={
+                                f.type === "date" ? todayISO() : undefined
+                              }
+                            />
+                            {id === "raceDate" &&
+                              typeof val === "string" &&
+                              val && (
+                                <div className="text-[11px] text-white/70">
+                                  {(() => {
+                                    const w = weeksUntil(val);
+                                    return w !== null ? `${w} weeks to go` : "";
+                                  })()}
+                                </div>
+                              )}
+                          </div>
+                        );
+                      })}
+
+                      {current.section === raceSection && (
+                        <div className="mt-2">
+                          {!showSecondEvent ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="rounded-xl border-white/20 bg-white/5 text-white hover:bg-white/10"
+                              onClick={onToggleSecondEvent}
+                            >
+                              Add another event
+                            </Button>
+                          ) : (
+                            <div className="space-y-5">
+                              <div className="mt-6 text-sm font-semibold text-white">
+                                Event 2
+                              </div>
+                              {event2FieldsFromRace(raceSection!).map((f2) => {
+                                const id2 = f2.id;
+                                const required2 = Boolean(f2.required);
+                                const val2 = answers[id2];
+
+                                return (
+                                  <div key={id2} className="space-y-2">
+                                    <div className="flex items-baseline justify-between">
+                                      <label className="text-sm font-medium text-white">
+                                        {f2.label}
+                                        {required2 ? " *" : " (optional)"}
+                                      </label>
+                                      {"placeholder" in f2 && f2.placeholder ? (
+                                        <span className="text-[11px] text-white/60">
+                                          {f2.placeholder}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <Field
+                                      field={f2}
+                                      value={val2}
+                                      onChange={(v) =>
+                                        setAnswers((a) => ({ ...a, [id2]: v }))
+                                      }
+                                      minISO={
+                                        f2.type === "date"
+                                          ? todayISO()
+                                          : undefined
+                                      }
+                                    />
+                                    {id2 === "raceDate2" &&
+                                      typeof val2 === "string" &&
+                                      val2 && (
+                                        <div className="text-[11px] text-white/70">
+                                          {(() => {
+                                            const w = weeksUntil(val2);
+                                            return w !== null
+                                              ? `${w} weeks to go`
+                                              : "";
+                                          })()}
+                                        </div>
+                                      )}
+                                  </div>
+                                );
+                              })}
+
+                              <div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="rounded-xl border-white/20 bg-white/5 text-white hover:bg-white/10"
+                                  onClick={onToggleSecondEvent}
+                                >
+                                  Remove event 2
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
 
             <div className="mt-10 flex items-center justify-between">
               <Button
                 variant="outline"
-                className="rounded-xl border-white/20 bg白/5 text-white hover:bg-white/10"
+                className="rounded-xl border-white/20 bg-white/5 text-white hover:bg-white/10"
                 onClick={goBack}
                 disabled={step === 0}
               >
@@ -681,7 +945,7 @@ export default function PlanSetup() {
                 onClick={goNext}
                 disabled={!canNext}
               >
-                {step < total - 1 ? "Next" : "See my AI-tuned week"}
+                {step < stages.length - 1 ? "Next" : "See my AI-tuned week"}
               </Button>
             </div>
 

@@ -1,58 +1,55 @@
-// src/types/intake.ts
-export type IntakeOption = { key: string; label: string };
+export type Option = { key: string; label: string };
 
-export type FieldSingleChoice = {
+export type FieldBase = {
+  id: string;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+};
+
+export type SingleChoiceField = FieldBase & {
   type: "singleChoice";
-  id: string;
-  label: string;
-  required?: boolean;
-  options: IntakeOption[];
-  placeholder?: string;
+  options: Option[];
 };
 
-export type FieldMultiSelect = {
+export type MultiSelectField = FieldBase & {
   type: "multiSelect";
-  id: string;
-  label: string;
-  required?: boolean;
-  options: IntakeOption[];
-  placeholder?: string;
+  options: Option[];
 };
 
-export type FieldHoursPerWeek = {
+export type HoursPerWeekField = FieldBase & {
   type: "hoursPerWeek";
-  id: "hours";
-  label: string;
-  required?: boolean;
   min: number;
   max: number;
 };
 
-export type FieldNumber = {
+export type NumberField = FieldBase & {
   type: "number";
-  id: string;
-  label: string;
-  required?: boolean;
   min: number;
   max: number;
   step?: number;
-  placeholder?: string;
 };
 
-export type FieldText = {
+export type TextField = FieldBase & {
   type: "text";
-  id: string;
-  label: string;
-  required?: boolean;
-  placeholder?: string;
+};
+
+export type DateField = FieldBase & {
+  type: "date";
+};
+
+export type TimeHMSField = FieldBase & {
+  type: "timeHMS";
 };
 
 export type IntakeField =
-  | FieldSingleChoice
-  | FieldMultiSelect
-  | FieldHoursPerWeek
-  | FieldNumber
-  | FieldText;
+  | SingleChoiceField
+  | MultiSelectField
+  | HoursPerWeekField
+  | NumberField
+  | TextField
+  | DateField
+  | TimeHMSField;
 
 export type IntakeSection = {
   title: string;
