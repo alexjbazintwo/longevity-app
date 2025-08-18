@@ -314,7 +314,7 @@ export const runningPack: VerticalPack = {
           href: "https://commons.wikimedia.org/wiki/File:Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg",
         },
     },
-  },
+  }, 
   nav: [
     { label: "Plans", to: "/setup" },
     { label: "Paces", to: "/#" },
