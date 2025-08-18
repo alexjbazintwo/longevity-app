@@ -1,4 +1,4 @@
-import type { IntakeSchema } from "./intake";
+import type { IntakeSchema } from "@/types/intake";
 
 export type CTAKind = "primary" | "secondary";
 
@@ -18,6 +18,8 @@ export type Hero = {
   subhead: string;
   ctas: HeroCTA[];
   slides: string[];
+  objectPosition?: Record<string, string>;
+  credits?: Record<string, { label: string; href: string }>;
 };
 
 export type NavItem = {
@@ -56,6 +58,47 @@ export type Assets = {
   featureImages: string[];
 };
 
+/* ——— Optional content blocks used by Home ——— */
+
+export type Proof = {
+  title: string;
+  stats: { value: string; label: string; note?: string }[];
+  footnote: string;
+};
+
+export type Outcomes = {
+  title: string;
+  items: { label: string; value: string }[];
+};
+
+export type Feature = {
+  key: string;
+  title: string;
+  text: string;
+  bullets: string[];
+  image: string;
+  icon: string; // mapped at render-time
+  reverse?: boolean;
+};
+
+export type CTA = {
+  smartAnalytics: {
+    title: string;
+    body: string;
+    stats: { icon: string; label: string; value: string }[];
+  };
+};
+
+export type Review = {
+  name: string;
+  role: string;
+  text: string;
+};
+
+export type Trust = {
+  badges: string[];
+};
+
 export type VerticalPack = {
   slug: string;
   themeClass: string;
@@ -67,53 +110,12 @@ export type VerticalPack = {
   planWeights: PlanWeights;
   copy: Copy;
   assets: Assets;
+
+  /* Optional, but used by Home if present */
+  trust?: Trust;
+  proof?: Proof;
+  outcomes?: Outcomes;
+  features?: Feature[];
+  cta?: CTA;
+  reviews?: Review[];
 };
-
-export type IconName =
-  | "HeartPulse"
-  | "Trophy"
-  | "Activity"
-  | "Brain"
-  | "LineChart";
-
-export type ProofStatItem = {
-  value: string;
-  label: string;
-  note?: string;
-};
-
-export type OutcomeItem = {
-  label: string;
-  value: string;
-};
-
-export type CTAStat = {
-  icon: IconName;
-  label: string;
-  value: string;
-};
-
-export type FeatureBlock = {
-  key: string;
-  title: string;
-  text: string;
-  bullets: string[];
-  image: string;
-  icon: IconName;
-  reverse?: boolean;
-};
-
-export interface ExtendedHero extends Hero {
-  objectPosition?: Record<string, string>;
-  credits?: Record<string, { label: string; href: string }>;
-}
-
-export interface ExtendedVerticalPack extends Omit<VerticalPack, "hero"> {
-  hero: ExtendedHero;
-  trust?: { badges: string[] };
-  proof: { title: string; stats: ProofStatItem[]; footnote: string };
-  outcomes: { title: string; items: OutcomeItem[] };
-  features: FeatureBlock[];
-  cta: { smartAnalytics: { title: string; body: string; stats: CTAStat[] } };
-  reviews: { name: string; role: string; text: string }[];
-}

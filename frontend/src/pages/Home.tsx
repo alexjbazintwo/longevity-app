@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useVertical } from "@/hooks/useVertical";
+import type { Feature, Review, HeroCTA, VerticalPack } from "@/types/vertical";
 
 type IconName = "HeartPulse" | "Trophy" | "Activity" | "Brain" | "LineChart";
 const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
@@ -38,18 +39,14 @@ function renderIcon(name: IconName, sizeClass: string) {
 
 export default function Home() {
   const { pack } = useVertical();
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [activeSlide, setActiveSlide] = useState<number>(0);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
 
-  const attributionBySrc: Record<string, { label: string; href: string }> =
-    (
-      pack.hero as unknown as {
-        credits?: Record<string, { label: string; href: string }>;
-      }
-    ).credits ?? {};
-  const heroObjectPosition: Record<string, string> =
-    (pack.hero as unknown as { objectPosition?: Record<string, string> })
-      .objectPosition ?? {};
+  const attributionBySrc: NonNullable<VerticalPack["hero"]["credits"]> =
+    pack.hero.credits ?? {};
+  const heroObjectPosition: NonNullable<
+    VerticalPack["hero"]["objectPosition"]
+  > = pack.hero.objectPosition ?? {};
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -65,7 +62,10 @@ export default function Home() {
     return () => clearInterval(id);
   }, [pack.hero.slides, failed]);
 
-  const bubbles = useMemo(() => pack.outcomes.items, [pack.outcomes.items]);
+  const bubbles = useMemo(
+    () => pack.outcomes?.items ?? [],
+    [pack.outcomes?.items]
+  );
   const currentSrc = pack.hero.slides[activeSlide];
   const credit = attributionBySrc[currentSrc];
 
@@ -83,14 +83,19 @@ export default function Home() {
                 className={`absolute inset-0 h-full w-full object-cover ${
                   hidden ? "hidden" : ""
                 }`}
-                style={{ objectPosition: heroObjectPosition[src] ?? "50% 50%" }}
-                initial={{ opacity: 0, scale: 1.05 }}
-                animate={{
-                  opacity: activeSlide === i ? 1 : 0,
-                  scale: activeSlide === i ? 1 : 1.05,
+                style={{
+                  objectPosition: heroObjectPosition[src] ?? "50% 50%",
+                  willChange: "opacity",
                 }}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-                onError={() => setFailed((f) => ({ ...f, [src]: true }))}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: activeSlide === i ? 1 : 0 }}
+                transition={{ duration: 1.0, ease: "easeOut" }}
+                onError={() =>
+                  setFailed((f) => ({
+                    ...f,
+                    [src]: true,
+                  }))
+                }
               />
             );
           })}
@@ -99,7 +104,8 @@ export default function Home() {
           <div className="pointer-events-none absolute left-10 bottom-0 h-72 w-72 rounded-full bg-sky-400/10 blur-[90px]" />
         </div>
 
-        <div className="relative mx-auto flex min-h-[78vh] w-full max-w-7xl flex-col justify-center gap-8 px-4 py-20 sm:px-8">
+        {/** ↓ shorter hero + cap max height to avoid overscaling the image */}
+        <div className="relative mx-auto flex w-full max-w-7xl flex-col justify-center gap-8 px-4 py-16 sm:px-8 min-h-[58vh] md:min-h-[64vh] lg:min-h-[66vh] xl:min-h-[62vh] max-h-[760px]">
           <Badge className="w-fit rounded-full bg-indigo-500/10 px-4 py-2 text-white/80 ring-1 ring-indigo-400/20 backdrop-blur">
             <span className="inline-flex items-center gap-2">
               <Cpu className="h-4 w-4" />
@@ -124,7 +130,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            {pack.hero.ctas.map((cta) => (
+            {pack.hero.ctas.map((cta: HeroCTA) => (
               <Button
                 key={cta.label}
                 asChild
@@ -143,28 +149,34 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="mt-8 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
-            <p className="text-xs uppercase tracking-wider text-white/85">
-              {pack.proof.title}
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {pack.proof.stats.map((s) => (
-                <div
-                  key={s.label}
-                  className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10"
-                >
-                  <div className="text-2xl font-semibold">{s.value}</div>
-                  <div className="text-sm text-white/85">{s.label}</div>
-                  {s.note && (
-                    <div className="text-[11px] text-white/75">{s.note}</div>
-                  )}
-                </div>
-              ))}
+          {pack.proof && (
+            <div className="mt-2 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
+              <p className="text-xs uppercase tracking-wider text-white/85">
+                {pack.proof.title}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {pack.proof.stats.map(
+                  (s: { value: string; label: string; note?: string }) => (
+                    <div
+                      key={s.label}
+                      className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10"
+                    >
+                      <div className="text-2xl font-semibold">{s.value}</div>
+                      <div className="text-sm text-white/85">{s.label}</div>
+                      {s.note && (
+                        <div className="text-[11px] text-white/75">
+                          {s.note}
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+              <div className="mt-2 text-[11px] text-white/75">
+                {pack.proof.footnote}
+              </div>
             </div>
-            <div className="mt-2 text-[11px] text-white/75">
-              {pack.proof.footnote}
-            </div>
-          </div>
+          )}
         </div>
 
         {credit && (
@@ -179,33 +191,35 @@ export default function Home() {
         )}
       </section>
 
-      <section className="relative">
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-2 sm:px-8">
-          <p className="mb-4 text-xs uppercase tracking-wider text-white/75">
-            {pack.outcomes.title}
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {bubbles.map((b) => (
-              <Card
-                key={b.label}
-                className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
-              >
-                <CardContent className="flex h-24 flex-col items-center justify-center p-0">
-                  <div className="text-3xl font-bold leading-none sm:text-4xl">
-                    {b.value}
-                  </div>
-                  <div className="mt-1 text-[11px] uppercase tracking-wider text-white/80">
-                    {b.label}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {pack.outcomes && (
+        <section className="relative">
+          <div className="relative mx-auto w-full max-w-7xl px-4 py-2 sm:px-8">
+            <p className="mb-4 text-xs uppercase tracking-wider text-white/75">
+              {pack.outcomes.title}
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(bubbles as { label: string; value: string }[]).map((b) => (
+                <Card
+                  key={b.label}
+                  className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
+                >
+                  <CardContent className="flex h-24 flex-col items-center justify-center p-0">
+                    <div className="text-3xl font-bold leading-none sm:text-4xl">
+                      {b.value}
+                    </div>
+                    <div className="mt-1 text-[11px] uppercase tracking-wider text-white/80">
+                      {b.label}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="mt-2 text-[11px] text-white/70">
+              Illustrative; individual results vary.
+            </div>
           </div>
-          <div className="mt-2 text-[11px] text-white/70">
-            Illustrative; individual results vary.
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="border-y border-indigo-300/15 bg-gradient-to-b from-black to-black/95">
         <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 px-4 py-12 sm:grid-cols-3 sm:px-8">
@@ -218,7 +232,7 @@ export default function Home() {
             </p>
           </div>
           <div className="grid grid-cols-3 items-center gap-4 opacity-90">
-            {(pack.trust?.badges ?? []).map((b) => (
+            {(pack.trust?.badges ?? []).map((b: string) => (
               <Badge
                 key={b}
                 className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15"
@@ -230,76 +244,92 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.12),transparent_35%)]" />
-        <div className="relative mx-auto w-full max-w-7xl space-y-20 px-4 py-20 sm:px-8">
-          {pack.features.map((f) => (
-            <FeatureRow
-              key={f.key}
-              title={f.title}
-              text={f.text}
-              bullets={f.bullets}
-              image={f.image}
-              icon={renderIcon(f.icon as IconName, "h-6 w-6")}
-              reverse={!!f.reverse}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="relative">
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(135deg,rgba(99,102,241,0.10),rgba(16,185,129,0.08))]" />
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 px-4 py-16 sm:grid-cols-2 sm:px-8">
-          <div>
-            <h3 className="text-2xl font-semibold sm:text-3xl">
-              {pack.cta.smartAnalytics.title}
-            </h3>
-            <p className="mt-3 max-w-xl text-white/85">
-              {pack.cta.smartAnalytics.body}
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button
-                className="rounded-xl bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 text-black"
-                asChild
-              >
-                <Link to="/setup">
-                  Try it free now
-                  <PlayCircle className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl border-indigo-300/20 bg-indigo-400/10 text-white hover:bg-indigo-400/15"
-              >
-                Explore the dashboard
-              </Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {pack.cta.smartAnalytics.stats.map((s, i) => (
-              <MiniStat
-                key={i}
-                label={s.label}
-                value={s.value}
-                icon={renderIcon(s.icon as IconName, "h-4 w-4")}
+      {pack.features && (
+        <section className="relative">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.12),transparent_35%)]" />
+          <div className="relative mx-auto w-full max-w-7xl space-y-20 px-4 py-20 sm:px-8">
+            {pack.features.map((f: Feature) => (
+              <FeatureRow
+                key={f.key}
+                title={f.title}
+                text={f.text}
+                bullets={f.bullets}
+                image={f.image}
+                icon={renderIcon(f.icon as IconName, "h-6 w-6")}
+                reverse={!!f.reverse}
               />
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <section>
-        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-8">
-          <h3 className="mb-8 text-2xl font-semibold tracking-tight sm:text-3xl">
-            What runners say
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {pack.reviews.map((r, i) => (
-              <ReviewCard key={i} name={r.name} role={r.role} text={r.text} />
-            ))}
+      {pack.cta?.smartAnalytics && (
+        <section className="relative">
+          <div className="absolute inset-0 -z-10 bg-[linear-gradient(135deg,rgba(99,102,241,0.10),rgba(16,185,129,0.08))]" />
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 px-4 py-16 sm:grid-cols-2 sm:px-8">
+            <div>
+              <h3 className="text-2xl font-semibold sm:text-3xl">
+                {pack.cta.smartAnalytics.title}
+              </h3>
+              <p className="mt-3 max-w-xl text-white/85">
+                {pack.cta.smartAnalytics.body}
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button
+                  className="rounded-xl bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 text-black"
+                  asChild
+                >
+                  <Link to="/setup">
+                    Try it free now
+                    <PlayCircle className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-xl border-indigo-300/20 bg-indigo-400/10 text-white hover:bg-indigo-400/15"
+                >
+                  Explore the dashboard
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {pack.cta.smartAnalytics.stats.map(
+                (
+                  s: { icon: string; label: string; value: string },
+                  i: number
+                ) => (
+                  <MiniStat
+                    key={`${s.label}-${i}`}
+                    label={s.label}
+                    value={s.value}
+                    icon={renderIcon(s.icon as IconName, "h-4 w-4")}
+                  />
+                )
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {pack.reviews && (
+        <section>
+          <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-8">
+            <h3 className="mb-8 text-2xl font-semibold tracking-tight sm:text-3xl">
+              What runners say
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {pack.reviews.map((r: Review, i: number) => (
+                <ReviewCard
+                  key={`${r.name}-${i}`}
+                  name={r.name}
+                  role={r.role}
+                  text={r.text}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -337,7 +367,7 @@ function FeatureRow({
         </h4>
         <p className="mt-3 max-w-xl text-white/85">{text}</p>
         <ul className="mt-4 grid gap-2 text-white/85">
-          {bullets.map((b) => (
+          {bullets.map((b: string) => (
             <li key={b} className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-amber-200 via-cyan-200 to-emerald-300" />
               <span className="text-sm">{b}</span>
@@ -399,7 +429,7 @@ function ReviewCard({
     <Card className="rounded-2xl border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10">
       <CardContent className="space-y-4 p-6">
         <div className="flex items-center gap-1">
-          {[...Array(5)].map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i: number) => (
             <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
           ))}
         </div>
