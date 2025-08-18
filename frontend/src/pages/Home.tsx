@@ -1,3 +1,4 @@
+// Home.tsx
 import {
   useEffect,
   useMemo,

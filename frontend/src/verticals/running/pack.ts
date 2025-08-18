@@ -1,7 +1,7 @@
+// runningPack.ts (data)
 import type { IntakeSchema } from "@/types/intake";
 import type { VerticalPack } from "@/types/vertical";
 
-/* ——— Intake schema ——— */
 const intakeSchema: IntakeSchema = [
   {
     title: "Time & current load",
@@ -282,7 +282,6 @@ const intakeSchema: IntakeSchema = [
   },
 ];
 
-/* ——— Running pack ——— */
 export const runningPack: VerticalPack = {
   slug: "running",
   themeClass: "theme-hybrid",
@@ -296,25 +295,36 @@ export const runningPack: VerticalPack = {
       { label: "See my AI-tuned week", to: "/plan-preview", kind: "secondary" },
     ],
     slides: [
-      "https://upload.wikimedia.org/wikipedia/commons/1/1b/Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg",
+      // Swapped: hero now shows Kipchoge
+      "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg",
       "https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
       "https://images.pexels.com/photos/3601094/pexels-photo-3601094.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
       "https://images.pexels.com/photos/891226/pexels-photo-891226.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
       "https://images.pexels.com/photos/1199590/pexels-photo-1199590.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
     ],
     objectPosition: {
-      // keep face in-frame without pushing too much zoom
+      // New focal point for Kipchoge hero
+      "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg":
+        "50% 35%",
+      // Keeping the Alex Yee mapping (now used below in a feature image if needed later)
       "https://upload.wikimedia.org/wikipedia/commons/1/1b/Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg":
-        "50% 10%",
+        "50% 12%",
     },
     credits: {
+      // Optional: show hero credit for Kipchoge
+      "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg":
+        {
+          label: "Eliud Kipchoge — Wikimedia Commons (CC BY-SA 4.0)",
+          href: "https://commons.wikimedia.org/wiki/File:Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg",
+        },
+      // Existing Alex Yee credit
       "https://upload.wikimedia.org/wikipedia/commons/1/1b/Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg":
         {
           label: "Alex Yee — Rz98 (CC BY-SA 4.0)",
           href: "https://commons.wikimedia.org/wiki/File:Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg",
         },
     },
-  }, 
+  },
   nav: [
     { label: "Plans", to: "/setup" },
     { label: "Paces", to: "/#" },
@@ -396,10 +406,11 @@ export const runningPack: VerticalPack = {
         "Smart taper & race-week cues",
       ],
       image:
-        "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/f/fd/PARIS_JOP_2024_TEST_EVENT_TRIATHLON_AUGUST_2023_%2853124751486%29.jpg", // <-- swap to this
       icon: "Trophy",
       reverse: true,
     },
+
     {
       key: "beginner",
       title: "Beginner or coming back? We’ll pace your ramp safely",
