@@ -1,4 +1,4 @@
-// runningPack.ts (data)
+// src/verticals/running/pack.ts
 import type { IntakeSchema } from "@/types/intake";
 import type { VerticalPack } from "@/types/vertical";
 
@@ -53,14 +53,25 @@ const intakeSchema: IntakeSchema = [
     ],
   },
   {
-    title: "Race details",
+    title: "Performance target",
     subtitle:
-      "Tell us about your target event. We’ll tune work–recovery, paces and taper.",
+      "Chasing a race or a PR? Pick your mode. No race date yet is fine — we’ll train toward a time goal.",
     fields: [
       {
         type: "singleChoice",
+        id: "targetMode",
+        label: "How do you want to target this?",
+        required: true,
+        options: [
+          { key: "race", label: "Race with a set date" },
+          { key: "raceTbd", label: "Race (date TBD)" },
+          { key: "timeTrial", label: "PR / Time-trial (no race)" },
+        ],
+      },
+      {
+        type: "singleChoice",
         id: "raceDistance",
-        label: "Event distance",
+        label: "Distance",
         required: true,
         options: [
           { key: "5k", label: "5K" },
@@ -73,8 +84,8 @@ const intakeSchema: IntakeSchema = [
       {
         type: "date",
         id: "raceDate",
-        label: "Race date",
-        required: true,
+        label: "Race date (if set)",
+        required: false,
       },
       {
         type: "timeHMS",
@@ -87,20 +98,30 @@ const intakeSchema: IntakeSchema = [
       {
         type: "timeHMS",
         id: "targetTime",
-        label: "Target finish time",
+        label: "Target finish time (optional)",
         required: false,
         placeholder: "HH:MM:SS",
       },
       {
         type: "singleChoice",
         id: "courseProfile",
-        label: "Course profile",
+        label: "Course profile (if racing)",
         required: false,
         options: [
           { key: "flat", label: "Flat" },
           { key: "rolling", label: "Rolling" },
           { key: "hilly", label: "Hilly" },
         ],
+      },
+      {
+        type: "number",
+        id: "goalHorizonWeeks",
+        label: "Target window (weeks)",
+        required: false,
+        min: 4,
+        max: 52,
+        step: 1,
+        placeholder: "e.g., 10",
       },
     ],
   },
@@ -295,7 +316,6 @@ export const runningPack: VerticalPack = {
       { label: "See my AI-tuned week", to: "/plan-preview", kind: "secondary" },
     ],
     slides: [
-      // Swapped: hero now shows Kipchoge
       "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg",
       "https://images.pexels.com/photos/2402777/pexels-photo-2402777.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
       "https://images.pexels.com/photos/3601094/pexels-photo-3601094.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
@@ -303,21 +323,17 @@ export const runningPack: VerticalPack = {
       "https://images.pexels.com/photos/1199590/pexels-photo-1199590.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1600",
     ],
     objectPosition: {
-      // New focal point for Kipchoge hero
       "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg":
         "50% 35%",
-      // Keeping the Alex Yee mapping (now used below in a feature image if needed later)
       "https://upload.wikimedia.org/wikipedia/commons/1/1b/Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg":
         "50% 12%",
     },
     credits: {
-      // Optional: show hero credit for Kipchoge
       "https://upload.wikimedia.org/wikipedia/commons/b/b2/Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg":
         {
           label: "Eliud Kipchoge — Wikimedia Commons (CC BY-SA 4.0)",
           href: "https://commons.wikimedia.org/wiki/File:Berlin-Marathon_2023_Eliud_Kipchoge_bei_Kilometer_25_A.jpg",
         },
-      // Existing Alex Yee credit
       "https://upload.wikimedia.org/wikipedia/commons/1/1b/Paris2024_-_Triathlon_-_19_-_Alex_Yee.jpg":
         {
           label: "Alex Yee — Rz98 (CC BY-SA 4.0)",
@@ -406,11 +422,10 @@ export const runningPack: VerticalPack = {
         "Smart taper & race-week cues",
       ],
       image:
-        "https://upload.wikimedia.org/wikipedia/commons/f/fd/PARIS_JOP_2024_TEST_EVENT_TRIATHLON_AUGUST_2023_%2853124751486%29.jpg", // <-- swap to this
+        "https://upload.wikimedia.org/wikipedia/commons/f/fd/PARIS_JOP_2024_TEST_EVENT_TRIATHLON_AUGUST_2023_%2853124751486%29.jpg",
       icon: "Trophy",
       reverse: true,
     },
-
     {
       key: "beginner",
       title: "Beginner or coming back? We’ll pace your ramp safely",
@@ -484,4 +499,41 @@ export const runningPack: VerticalPack = {
     },
   ],
   assets: { featureImages: [] },
+  flow: {
+    chatFirst: true,
+    requirePriority: true,
+    motives: [
+      {
+        key: "race",
+        label: "Race / PR",
+        hint: "Specific event or time goal",
+        anchorFieldId: "raceDistance",
+      },
+      {
+        key: "distance",
+        label: "Distance",
+        hint: "Build up without racing",
+        anchorFieldId: "distanceGoal",
+      },
+      {
+        key: "health",
+        label: "Health",
+        hint: "Energy, cardio, metabolic",
+        anchorFieldId: "healthFocus",
+      },
+      {
+        key: "comeback",
+        label: "Comeback",
+        hint: "After time off or niggle",
+        anchorFieldId: "physioCleared",
+      },
+      {
+        key: "habit",
+        label: "Habit",
+        hint: "Consistency & routine",
+        anchorFieldId: "coachingStyle",
+      },
+    ],
+    commonSectionAnchors: ["hours", "surface", "coachingStyle"],
+  },
 };
