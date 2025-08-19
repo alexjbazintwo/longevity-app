@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ChatWizardContext } from "@/context/chatWizardContext";
+import ChatWizardContext from "@/context/chatWizardContext";
 
 export function useChatWizard() {
   const ctx = useContext(ChatWizardContext);

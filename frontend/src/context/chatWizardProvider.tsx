@@ -1,29 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ChatWizardContext,
-} from "@/context/chatWizardContext";
+import ChatWizardContext from "@/context/chatWizardContext";
 import type {
   ChatMessage,
   Reply,
+  Answers,
+  Node,
+  ChatWizardContextValue,
 } from "@/context/chatWizardContext";
 
-type Answers = Record<string, string | number>;
-type Node =
-  | "askName"
-  | "askTargetMode"
-  | "askDistance"
-  | "askCurrentTime"
-  | "askTargetTime"
-  | "askRaceDate"
-  | "askHorizonWeeks"
-  | "askHours"
-  | "askMileage"
-  | "askLongest"
-  | "askRecent5k"
-  | "confirm";
-
 const lsPrefix = "chatWizard";
-const lsOpen = `${lsPrefix}.open`;
 const lsMsgs = `${lsPrefix}.messages`;
 const lsNode = `${lsPrefix}.node`;
 const lsAns = `${lsPrefix}.answers`;
@@ -31,6 +16,36 @@ const lsAns = `${lsPrefix}.answers`;
 function uid() {
   return Math.random().toString(36).slice(2);
 }
+
+const nodeOrder: Node[] = [
+  "askName",
+  "askTargetMode",
+  "askDistance",
+  "askCurrentTime",
+  "askTargetTime",
+  "askRaceDate",
+  "askHorizonWeeks",
+  "askHours",
+  "askMileage",
+  "askLongest",
+  "askRecent5k",
+  "confirm",
+];
+
+const nodeAnswerKeys: Record<Node, string[]> = {
+  askName: ["name"],
+  askTargetMode: ["targetMode"],
+  askDistance: ["raceDistance"],
+  askCurrentTime: ["currentFitnessTime"],
+  askTargetTime: ["targetTime"],
+  askRaceDate: ["raceDate"],
+  askHorizonWeeks: ["goalHorizonWeeks"],
+  askHours: ["hours"],
+  askMileage: ["currentMileage"],
+  askLongest: ["longestRun"],
+  askRecent5k: ["recent5kTime"],
+  confirm: [],
+};
 
 function seedBot(): ChatMessage[] {
   const now = Date.now();
@@ -40,8 +55,16 @@ function seedBot(): ChatMessage[] {
       author: "bot",
       text: "Hi! I’m Coach Kaia. Let’s get your goal dialed in.",
       ts: now,
+      kind: "text",
     },
-    { id: uid(), author: "bot", text: "What’s your name?", ts: now + 1 },
+    {
+      id: uid(),
+      author: "bot",
+      text: "What’s your name?",
+      ts: now + 1,
+      kind: "prompt",
+      node: "askName",
+    },
   ];
 }
 
@@ -64,12 +87,12 @@ function normaliseTime(s: string) {
   }
   if (parts.length === 2) {
     const [M, S] = parts;
-    const m = String(Math.max(0, Number(M) || 0));
-    const s2 = String(Math.max(0, Math.min(59, Number(S) || 0))).padStart(
+    const mm = String(Math.max(0, Number(M) || 0)).padStart(2, "0");
+    const ss = String(Math.max(0, Math.min(59, Number(S) || 0))).padStart(
       2,
       "0"
     );
-    return `0:${m.padStart(2, "0")}:${s2}`;
+    return `0:${mm}:${ss}`;
   }
   return "";
 }
@@ -78,39 +101,69 @@ function isISODate(s: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 }
 
+function nodeAllowsSkip(n: Node): boolean {
+  return n === "askTargetTime" || n === "askLongest" || n === "askRecent5k";
+}
+
+function repliesForNode(n: Node): Reply[] {
+  if (n === "askTargetMode") {
+    return [
+      { label: "Race date set", value: "race" },
+      { label: "Race date TBD", value: "raceTbd" },
+      { label: "PR / time-trial", value: "timeTrial" },
+    ];
+  }
+  if (n === "askDistance") {
+    return [
+      { label: "5K", value: "5k" },
+      { label: "10K", value: "10k" },
+      { label: "Half Marathon", value: "half" },
+      { label: "Marathon", value: "marathon" },
+      { label: "Ultra", value: "ultra" },
+    ];
+  }
+  if (n === "askTargetTime") return [{ label: "Skip", value: "skip" }];
+  if (n === "askHorizonWeeks")
+    return [
+      { label: "6", value: "6" },
+      { label: "8", value: "8" },
+      { label: "10", value: "10" },
+      { label: "12", value: "12" },
+    ];
+  if (n === "askLongest") return [{ label: "Skip", value: "skip" }];
+  if (n === "askRecent5k") return [{ label: "Skip", value: "skip" }];
+  if (n === "confirm")
+    return [
+      { label: "Looks good", value: "ok" },
+      { label: "I’ll edit later", value: "ok" },
+    ];
+  return [];
+}
+
 export default function ChatWizardProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [chatOpen, setChatOpen] = useState<boolean>(() => {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const raw = localStorage.getItem(lsOpen);
-      return raw ? JSON.parse(raw) : false;
+      const raw = localStorage.getItem(lsMsgs);
+      if (raw) {
+        const arr = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(arr) && arr.length) return arr;
+      }
     } catch {
-      return false;
+      console.warn("read messages failed");
     }
+    return seedBot();
   });
-
-const [messages, setMessages] = useState<ChatMessage[]>(() => {
-  try {
-    const raw = localStorage.getItem(lsMsgs);
-    if (raw) {
-      const arr = JSON.parse(raw) as ChatMessage[];
-      if (Array.isArray(arr) && arr.length) return arr;
-    }
-  } catch {
-    void 0;
-  }
-  return seedBot();
-});
-
 
   const [node, setNode] = useState<Node>(() => {
     try {
-      const raw = localStorage.getItem(lsNode);
-      return (raw as Node) || "askName";
+      const raw = localStorage.getItem(lsNode) as Node | null;
+      return raw ?? "askName";
     } catch {
+      console.warn("read node failed");
       return "askName";
     }
   });
@@ -120,61 +173,45 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       const raw = localStorage.getItem(lsAns);
       return raw ? (JSON.parse(raw) as Answers) : {};
     } catch {
+      console.warn("read answers failed");
       return {};
     }
   });
 
+  const [isComplete, setIsComplete] = useState<boolean>(false);
   const [input, setInput] = useState("");
-  const [quickReplies, setQuickReplies] = useState<Reply[]>(() => {
-    if (node === "askTargetMode")
-      return [
-        { label: "Race date set", value: "race" },
-        { label: "Race date TBD", value: "raceTbd" },
-        { label: "PR / time-trial", value: "timeTrial" },
-      ];
-    return [];
-  });
+  const [quickReplies, setQuickReplies] = useState<Reply[]>(() =>
+    repliesForNode(node)
+  );
 
-  // chatOpen effect
-  useEffect(() => {
-    try {
-      localStorage.setItem(lsOpen, JSON.stringify(chatOpen));
-    } catch {
-      void 0;
-    }
-  }, [chatOpen]);
-
-  // messages effect
   useEffect(() => {
     try {
       localStorage.setItem(lsMsgs, JSON.stringify(messages));
     } catch {
-      void 0;
+      console.warn("write messages failed");
     }
   }, [messages]);
 
-  // node effect
   useEffect(() => {
     try {
       localStorage.setItem(lsNode, node);
     } catch {
-      void 0;
+      console.warn("write node failed");
     }
   }, [node]);
 
-  // answers effect (both try/catch blocks)
   useEffect(() => {
     try {
       localStorage.setItem(lsAns, JSON.stringify(answers));
     } catch {
-      void 0;
+      console.warn("write answers failed");
     }
     try {
       const prev = localStorage.getItem("setupAnswers");
       const merged = prev ? { ...JSON.parse(prev), ...answers } : answers;
       localStorage.setItem("setupAnswers", JSON.stringify(merged));
     } catch {
-      void 0;
+      console.warn("write setupAnswers failed");
     }
   }, [answers]);
 
@@ -183,111 +220,89 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
     setMessages((cur) => cur.concat(arr));
   }, []);
 
-  const botSay = useCallback(
-    (text: string) => {
-      push({ id: uid(), author: "bot", text, ts: Date.now() });
+  const ask = useCallback(
+    (n: Node, text: string) => {
+      setNode(n);
+      setQuickReplies(repliesForNode(n));
+      push({
+        id: uid(),
+        author: "bot",
+        text,
+        ts: Date.now(),
+        kind: "prompt",
+        node: n,
+      });
     },
     [push]
   );
 
-  const setReplies = useCallback((items: Reply[]) => {
-    setQuickReplies(items);
-  }, []);
+  const botSayText = useCallback(
+    (text: string) => {
+      push({ id: uid(), author: "bot", text, ts: Date.now(), kind: "text" });
+    },
+    [push]
+  );
 
   const nextTargetMode = useCallback(
     (name: string) => {
-      botSay(
+      ask(
+        "askTargetMode",
         `Nice to meet you, ${name}. Are you training for a set race date, a race with date TBD, or just a PR/time-trial?`
       );
-      setReplies([
-        { label: "Race date set", value: "race" },
-        { label: "Race date TBD", value: "raceTbd" },
-        { label: "PR / time-trial", value: "timeTrial" },
-      ]);
-      setNode("askTargetMode");
     },
-    [botSay, setReplies]
+    [ask]
   );
 
   const nextDistance = useCallback(() => {
-    botSay("Great. What distance are we targeting?");
-    setReplies([
-      { label: "5K", value: "5k" },
-      { label: "10K", value: "10k" },
-      { label: "Half Marathon", value: "half" },
-      { label: "Marathon", value: "marathon" },
-      { label: "Ultra", value: "ultra" },
-    ]);
-    setNode("askDistance");
-  }, [botSay, setReplies]);
+    ask("askDistance", "Great. What distance are we targeting?");
+  }, [ask]);
 
   const nextCurrentTime = useCallback(() => {
-    botSay(
+    ask(
+      "askCurrentTime",
       "If you raced this distance today, what time would you run? Use HH:MM:SS or MM:SS."
     );
-    setReplies([]);
-    setNode("askCurrentTime");
-  }, [botSay, setReplies]);
+  }, [ask]);
 
   const nextTargetTime = useCallback(() => {
-    botSay("What’s your goal time? You can type Skip to continue.");
-    setReplies([{ label: "Skip", value: "skip" }]);
-    setNode("askTargetTime");
-  }, [botSay, setReplies]);
+    ask(
+      "askTargetTime",
+      "What’s your goal time? You can type Skip to continue."
+    );
+  }, [ask]);
 
   const nextRaceDateOrWindow = useCallback(
     (mode: string) => {
       if (mode === "race") {
-        botSay("What’s the race date? Use YYYY-MM-DD.");
-        setReplies([]);
-        setNode("askRaceDate");
+        ask("askRaceDate", "What’s the race date? Use YYYY-MM-DD.");
       } else {
-        botSay(
+        ask(
+          "askHorizonWeeks",
           "What training window are you thinking, in weeks? For example: 10"
         );
-        setReplies([
-          { label: "6", value: "6" },
-          { label: "8", value: "8" },
-          { label: "10", value: "10" },
-          { label: "12", value: "12" },
-        ]);
-        setNode("askHorizonWeeks");
       }
     },
-    [botSay, setReplies]
+    [ask]
   );
 
   const nextHours = useCallback(() => {
-    botSay("How many hours per week can you run?");
-    setReplies([
-      { label: "2", value: "2" },
-      { label: "3", value: "3" },
-      { label: "4", value: "4" },
-      { label: "5", value: "5" },
-      { label: "6", value: "6" },
-      { label: "8", value: "8" },
-      { label: "10", value: "10" },
-    ]);
-    setNode("askHours");
-  }, [botSay, setReplies]);
+    ask("askHours", "How many hours per week can you run?");
+  }, [ask]);
 
   const nextMileage = useCallback(() => {
-    botSay("What’s your current weekly distance? Enter a number.");
-    setReplies([]);
-    setNode("askMileage");
-  }, [botSay, setReplies]);
+    ask("askMileage", "What’s your current weekly distance? Enter a number.");
+  }, [ask]);
 
   const nextLongest = useCallback(() => {
-    botSay("Longest continuous run in the last 4–6 weeks? You can type Skip.");
-    setReplies([{ label: "Skip", value: "skip" }]);
-    setNode("askLongest");
-  }, [botSay, setReplies]);
+    ask(
+      "askLongest",
+      "Longest continuous run in the last 4–6 weeks? You can type Skip."
+    );
+  }, [ask]);
 
   const nextRecent5k = useCallback(() => {
-    botSay("Most recent 5K time? You can type Skip.");
-    setReplies([{ label: "Skip", value: "skip" }]);
-    setNode("askRecent5k");
-  }, [botSay, setReplies]);
+    ask("askRecent5k", "Most recent 5K time? You can type Skip.");
+  }, [ask]);
 
   const nextConfirm = useCallback(() => {
     const name = (answers["name"] as string) || "Runner";
@@ -311,14 +326,10 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       `Weekly distance: ${mi || "-"}`,
     ].filter(Boolean);
 
-    botSay("Here’s what I’ve got:");
-    botSay(summaryParts.join(" • "));
-    setReplies([
-      { label: "Looks good", value: "ok" },
-      { label: "I’ll edit later", value: "ok" },
-    ]);
-    setNode("confirm");
-  }, [answers, botSay, setReplies]);
+    botSayText("Here’s what I’ve got:");
+    botSayText(summaryParts.join(" • "));
+    ask("confirm", "Ready to continue?");
+  }, [answers, ask, botSayText]);
 
   const persistDefaults = useCallback(() => {
     setAnswers((a) => {
@@ -334,7 +345,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       if (!text) return;
       const now = Date.now();
       setMessages((cur) =>
-        cur.concat({ id: uid(), author: "user", text, ts: now })
+        cur.concat({ id: uid(), author: "user", text, ts: now, kind: "text" })
       );
       setInput("");
 
@@ -353,7 +364,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
         else if (v.includes("tbd")) mode = "raceTbd";
         else if (v.includes("race")) mode = "race";
         if (!mode) {
-          botSay("Please choose one of the options.");
+          botSayText("Please choose one of the options.");
           return;
         }
         setAnswers((a) => ({ ...a, targetMode: mode }));
@@ -375,7 +386,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
         };
         const pick = map[v] || v;
         if (!["5k", "10k", "half", "marathon", "ultra"].includes(pick)) {
-          botSay("Please pick 5K, 10K, Half, Marathon or Ultra.");
+          botSayText("Please pick 5K, 10K, Half, Marathon or Ultra.");
           return;
         }
         setAnswers((a) => ({ ...a, raceDistance: pick }));
@@ -386,7 +397,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       if (node === "askCurrentTime") {
         const norm = normaliseTime(text);
         if (!norm) {
-          botSay("Please enter time as HH:MM:SS or MM:SS.");
+          botSayText("Please enter time as HH:MM:SS or MM:SS.");
           return;
         }
         setAnswers((a) => ({ ...a, currentFitnessTime: norm }));
@@ -398,7 +409,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
         if (text.toLowerCase() !== "skip") {
           const norm = normaliseTime(text);
           if (!norm) {
-            botSay("Enter HH:MM:SS, MM:SS, or type Skip.");
+            botSayText("Enter HH:MM:SS, MM:SS, or type Skip.");
             return;
           }
           setAnswers((a) => ({ ...a, targetTime: norm }));
@@ -410,7 +421,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
 
       if (node === "askRaceDate") {
         if (!isISODate(text)) {
-          botSay("Please use YYYY-MM-DD.");
+          botSayText("Please use YYYY-MM-DD.");
           return;
         }
         setAnswers((a) => ({ ...a, raceDate: text }));
@@ -421,7 +432,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       if (node === "askHorizonWeeks") {
         const n = Number(text);
         if (!Number.isFinite(n) || n <= 0) {
-          botSay("Enter a positive number of weeks.");
+          botSayText("Enter a positive number of weeks.");
           return;
         }
         setAnswers((a) => ({ ...a, goalHorizonWeeks: String(Math.round(n)) }));
@@ -432,7 +443,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       if (node === "askHours") {
         const n = Number(text);
         if (!Number.isFinite(n) || n < 0) {
-          botSay("Enter hours per week as a number.");
+          botSayText("Enter hours per week as a number.");
           return;
         }
         setAnswers((a) => ({ ...a, hours: Math.round(n) }));
@@ -443,7 +454,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       if (node === "askMileage") {
         const n = Number(text);
         if (!Number.isFinite(n) || n < 0) {
-          botSay("Enter a non-negative number.");
+          botSayText("Enter a non-negative number.");
           return;
         }
         setAnswers((a) => ({ ...a, currentMileage: Math.round(n) }));
@@ -455,7 +466,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
         if (text.toLowerCase() !== "skip") {
           const n = Number(text);
           if (!Number.isFinite(n) || n < 0) {
-            botSay("Enter a non-negative number or type Skip.");
+            botSayText("Enter a non-negative number or type Skip.");
             return;
           }
           setAnswers((a) => ({ ...a, longestRun: Math.round(n) }));
@@ -468,7 +479,7 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
         if (text.toLowerCase() !== "skip") {
           const norm = normaliseTime(text);
           if (!norm) {
-            botSay("Enter HH:MM:SS, MM:SS, or type Skip.");
+            botSayText("Enter HH:MM:SS, MM:SS, or type Skip.");
             return;
           }
           setAnswers((a) => ({ ...a, recent5kTime: norm }));
@@ -479,7 +490,8 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
 
       if (node === "confirm") {
         setQuickReplies([]);
-        botSay(
+        setIsComplete(true);
+        botSayText(
           "All set. You can review or tweak any fields on the next screen."
         );
         return;
@@ -489,8 +501,8 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
       input,
       node,
       answers,
-      botSay,
       nextTargetMode,
+      botSayText,
       nextDistance,
       nextCurrentTime,
       nextTargetTime,
@@ -511,26 +523,75 @@ const [messages, setMessages] = useState<ChatMessage[]>(() => {
     [sendText]
   );
 
+  const goBackOne = useCallback(() => {
+    const promptIndexes = messages
+      .map((m, i) => ({ i, m }))
+      .filter(({ m }) => m.kind === "prompt" && m.node) as Array<{
+      i: number;
+      m: ChatMessage & { node: Node; kind: "prompt" };
+    }>;
+
+    if (promptIndexes.length < 2) return;
+
+    const prevPrompt = promptIndexes[promptIndexes.length - 2];
+    const prevNode = prevPrompt.m.node;
+
+    setMessages((cur) => cur.slice(0, prevPrompt.i + 1));
+    setNode(prevNode);
+    setQuickReplies(repliesForNode(prevNode));
+    setIsComplete(false);
+
+    const cutoffIdx = nodeOrder.indexOf(prevNode);
+    if (cutoffIdx >= 0) {
+      const keysToClear = nodeOrder
+        .slice(cutoffIdx + 1)
+        .flatMap((n) => nodeAnswerKeys[n]);
+      if (keysToClear.length > 0) {
+        setAnswers((a) => {
+          const next = { ...a };
+          keysToClear.forEach((k) => {
+            delete next[k];
+          });
+          return next;
+        });
+      }
+    }
+    setInput("");
+  }, [messages]);
+
   const reset = useCallback(() => {
     setMessages(seedBot());
     setNode("askName");
     setAnswers({});
-    setQuickReplies([]);
+    setQuickReplies(repliesForNode("askName"));
+    setInput("");
+    setIsComplete(false);
   }, []);
 
-  const ctx = useMemo(
+  const ctx: ChatWizardContextValue = useMemo(
     () => ({
-      chatOpen,
-      setChatOpen,
       messages,
       input,
       setInput,
       quickReplies,
+      canSkip: nodeAllowsSkip(node),
+      isComplete,
       sendText,
       sendOption,
+      goBackOne,
       reset,
     }),
-    [chatOpen, messages, input, quickReplies, sendText, sendOption, reset]
+    [
+      messages,
+      input,
+      node,
+      isComplete,
+      quickReplies,
+      sendText,
+      sendOption,
+      goBackOne,
+      reset,
+    ]
   );
 
   return (
