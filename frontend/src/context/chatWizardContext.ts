@@ -7,41 +7,45 @@ export type ChatMessage = {
   author: Author;
   text: string;
   ts: number;
-  kind?: "prompt" | "text";
-  node?: Node;
 };
 
 export type Reply = { label: string; value: string };
 
-export type Answers = Record<string, string | number>;
-
 export type Node =
   | "askName"
-  | "askTargetMode"
+  | "askReason"
+  | "askUnits"
   | "askDistance"
+  | "askRaceDate"
+  | "askWindowUnit"
+  | "askHorizonWeeks"
+  | "askHorizonMonths"
   | "askCurrentTime"
   | "askTargetTime"
-  | "askRaceDate"
-  | "askHorizonWeeks"
+  | "askRecent5k"
+  | "askComfortablePace"
   | "askHours"
   | "askMileage"
-  | "askLongest"
-  | "askRecent5k"
+  | "askLongestTime"
   | "confirm";
+
+export type Answers = Record<string, string | number>;
 
 export type ChatWizardContextValue = {
   messages: ChatMessage[];
+  quickReplies: Reply[];
   input: string;
   setInput: (v: string) => void;
-
-  quickReplies: Reply[];
-  canSkip: boolean;
-  isComplete: boolean;
-
   sendText: (text?: string) => void;
   sendOption: (value: string) => void;
+  sendDate: (iso: string) => void;
   goBackOne: () => void;
   reset: () => void;
+  isComplete: boolean;
+  startOnMonday: boolean;
+  toggleStartOnMonday: () => void;
+  node: Node;
+  answers: Readonly<Answers>;
 };
 
 const ChatWizardContext = createContext<ChatWizardContextValue | null>(null);

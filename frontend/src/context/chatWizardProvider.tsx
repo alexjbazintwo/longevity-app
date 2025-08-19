@@ -1,119 +1,126 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ChatWizardContext from "@/context/chatWizardContext";
-import type {
-  ChatMessage,
-  Reply,
-  Answers,
-  Node,
-  ChatWizardContextValue,
+import ChatWizardContext, {
+  type ChatMessage,
+  type Reply,
+  type Node,
+  type ChatWizardContextValue,
+  type Answers,
 } from "@/context/chatWizardContext";
 
-const lsPrefix = "chatWizard";
-const lsMsgs = `${lsPrefix}.messages`;
-const lsNode = `${lsPrefix}.node`;
-const lsAns = `${lsPrefix}.answers`;
-
-function uid() {
+function uid(): string {
   return Math.random().toString(36).slice(2);
 }
 
-const nodeOrder: Node[] = [
-  "askName",
-  "askTargetMode",
-  "askDistance",
-  "askCurrentTime",
-  "askTargetTime",
-  "askRaceDate",
-  "askHorizonWeeks",
-  "askHours",
-  "askMileage",
-  "askLongest",
-  "askRecent5k",
-  "confirm",
-];
-
-const nodeAnswerKeys: Record<Node, string[]> = {
-  askName: ["name"],
-  askTargetMode: ["targetMode"],
-  askDistance: ["raceDistance"],
-  askCurrentTime: ["currentFitnessTime"],
-  askTargetTime: ["targetTime"],
-  askRaceDate: ["raceDate"],
-  askHorizonWeeks: ["goalHorizonWeeks"],
-  askHours: ["hours"],
-  askMileage: ["currentMileage"],
-  askLongest: ["longestRun"],
-  askRecent5k: ["recent5kTime"],
-  confirm: [],
-};
-
-function seedBot(): ChatMessage[] {
-  const now = Date.now();
-  return [
-    {
-      id: uid(),
-      author: "bot",
-      text: "Hi! I’m Coach Kaia. Let’s get your goal dialed in.",
-      ts: now,
-      kind: "text",
-    },
-    {
-      id: uid(),
-      author: "bot",
-      text: "What’s your name?",
-      ts: now + 1,
-      kind: "prompt",
-      node: "askName",
-    },
-  ];
+function fmtDate(d: Date): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
 }
 
-function normaliseTime(s: string) {
-  const t = s.trim();
-  if (!t) return "";
-  const parts = t.split(":").map((x) => x.trim());
-  if (parts.length === 3) {
-    const [H, M, S] = parts;
-    const h = String(Math.max(0, Number(H) || 0));
-    const m = String(Math.max(0, Math.min(59, Number(M) || 0))).padStart(
-      2,
-      "0"
-    );
-    const s2 = String(Math.max(0, Math.min(59, Number(S) || 0))).padStart(
-      2,
-      "0"
-    );
-    return `${h}:${m}:${s2}`;
-  }
-  if (parts.length === 2) {
-    const [M, S] = parts;
-    const mm = String(Math.max(0, Number(M) || 0)).padStart(2, "0");
-    const ss = String(Math.max(0, Math.min(59, Number(S) || 0))).padStart(
-      2,
-      "0"
-    );
-    return `0:${mm}:${ss}`;
-  }
-  return "";
+function today(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-function isISODate(s: string) {
+function addWeeks(from: Date, w: number): Date {
+  const d = new Date(from);
+  d.setDate(d.getDate() + Math.round(w) * 7);
+  return d;
+}
+
+function addMonths(from: Date, m: number): Date {
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + Math.round(m));
+  return d;
+}
+
+function weeksBetween(a: Date, b: Date): number {
+  const ms = b.getTime() - a.getTime();
+  return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24 * 7)));
+}
+
+function isISODate(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 }
 
-function nodeAllowsSkip(n: Node): boolean {
-  return n === "askTargetTime" || n === "askLongest" || n === "askRecent5k";
+type Step = { node: Node; answerKeys: string[] };
+
+/** Merge Partial<Answers> into Answers without carrying over `undefined` values. */
+function mergeAnswers(base: Answers, delta: Partial<Answers>): Answers {
+  const out: Answers = { ...base };
+  for (const [k, v] of Object.entries(delta)) {
+    if (v !== undefined) {
+      out[k] = v as string | number;
+    }
+  }
+  return out;
 }
 
-function repliesForNode(n: Node): Reply[] {
-  if (n === "askTargetMode") {
+function promptForNode(node: Node, answers: Answers): string {
+  const name = (answers["name"] as string) || "";
+  const units = (answers["units"] as string) || "km";
+  switch (node) {
+    case "askName":
+      return "Hi! I’m Coach Kaia — your AI running coach. What’s your name?";
+    case "askReason":
+      return `Nice to meet you, ${name}. What brings you to Runzi today?`;
+    case "askUnits":
+      return "Which units do you prefer?";
+    case "askDistance":
+      return "Great — what distance are we targeting?";
+    case "askRaceDate":
+      return "Are you training for a race with a set date (that will be your plan length), or would you rather choose a plan length yourself?";
+    case "askWindowUnit":
+      return "Should we frame your plan in weeks or months?";
+    case "askHorizonWeeks":
+      return "How many weeks do you want to train?";
+    case "askHorizonMonths":
+      return "How many months do you want to train?";
+    case "askCurrentTime":
+      return "If you raced that distance today, what time would you run? (or Skip).";
+    case "askTargetTime":
+      return "What’s your goal time? (or Skip).";
+    case "askRecent5k":
+      return "Do you know your most recent 5K time? (or Skip).";
+    case "askComfortablePace":
+      return `Roughly what’s your typical easy pace per ${
+        units === "mi" ? "mile" : "km"
+      }? (or Skip).`;
+    case "askHours":
+      return "How many hours per week can you run?";
+    case "askMileage":
+      return `What’s your current weekly distance (in ${units})? Just the number.`;
+    case "askLongestTime":
+      return "Longest continuous run in the last 4–6 weeks? (or Skip).";
+    case "confirm":
+      return "Here’s what I’ve got:";
+    default:
+      return "";
+  }
+}
+
+function repliesForNode(node: Node): Reply[] {
+  if (node === "askReason") {
     return [
-      { label: "Race date set", value: "race" },
-      { label: "Race date TBD", value: "raceTbd" },
-      { label: "PR / time-trial", value: "timeTrial" },
+      { label: "Race or time goal", value: "raceOrTime" },
+      { label: "Build distance", value: "distance" },
+      { label: "Health / habit", value: "health" },
     ];
   }
-  if (n === "askDistance") {
+  if (node === "askUnits") {
+    return [
+      { label: "Kilometres (km)", value: "km" },
+      { label: "Miles (mi)", value: "mi" },
+    ];
+  }
+  if (node === "askDistance") {
     return [
       { label: "5K", value: "5k" },
       { label: "10K", value: "10k" },
@@ -122,22 +129,115 @@ function repliesForNode(n: Node): Reply[] {
       { label: "Ultra", value: "ultra" },
     ];
   }
-  if (n === "askTargetTime") return [{ label: "Skip", value: "skip" }];
-  if (n === "askHorizonWeeks")
+  if (node === "askRaceDate") {
+    return [{ label: "Choose plan length instead", value: "noDate" }];
+  }
+  if (node === "askWindowUnit") {
+    return [
+      { label: "Weeks", value: "weeks" },
+      { label: "Months", value: "months" },
+    ];
+  }
+  if (node === "askHorizonWeeks") {
     return [
       { label: "6", value: "6" },
       { label: "8", value: "8" },
       { label: "10", value: "10" },
       { label: "12", value: "12" },
+      { label: "16", value: "16" },
+      { label: "20", value: "20" },
     ];
-  if (n === "askLongest") return [{ label: "Skip", value: "skip" }];
-  if (n === "askRecent5k") return [{ label: "Skip", value: "skip" }];
-  if (n === "confirm")
+  }
+  if (node === "askHorizonMonths") {
     return [
-      { label: "Looks good", value: "ok" },
-      { label: "I’ll edit later", value: "ok" },
+      { label: "3", value: "3" },
+      { label: "4", value: "4" },
+      { label: "6", value: "6" },
+      { label: "9", value: "9" },
+      { label: "12", value: "12" },
     ];
+  }
+  if (
+    node === "askCurrentTime" ||
+    node === "askTargetTime" ||
+    node === "askRecent5k" ||
+    node === "askComfortablePace" ||
+    node === "askLongestTime"
+  ) {
+    return [{ label: "Skip", value: "skip" }];
+  }
+  if (node === "askHours") {
+    return [
+      { label: "2", value: "2" },
+      { label: "3", value: "3" },
+      { label: "4", value: "4" },
+      { label: "5", value: "5" },
+      { label: "6", value: "6" },
+      { label: "8", value: "8" },
+      { label: "10", value: "10" },
+      { label: "12", value: "12" },
+      { label: "15", value: "15" },
+      { label: "20", value: "20" },
+    ];
+  }
+  if (node === "confirm") {
+    return [{ label: "Looks good", value: "ok" }];
+  }
   return [];
+}
+
+function summaryParagraph(answers: Answers): string {
+  const name = (answers["name"] as string) || "Runner";
+  const dist = (answers["raceDistance"] as string) || "";
+  const units = (answers["units"] as string) || "km";
+  const current = (answers["currentFitnessTime"] as string) || "";
+  const goal = (answers["targetTime"] as string) || "";
+  const hours = answers["hours"];
+  const weekly = answers["currentMileage"];
+  const raceISO = answers["raceDate"] as string | undefined;
+  const weeks = answers["goalHorizonWeeks"]
+    ? Number(answers["goalHorizonWeeks"])
+    : undefined;
+  const months = answers["goalHorizonMonths"]
+    ? Number(answers["goalHorizonMonths"])
+    : undefined;
+
+  const start = today();
+  const parts: string[] = [];
+  parts.push(`${name}, here’s what I have so far.`);
+  if (dist) parts.push(`You’re focusing on the ${dist}.`);
+  if (current) parts.push(`Right now you’d expect around ${current}.`);
+  if (goal) parts.push(`You’d like to target about ${goal}.`);
+  if (typeof hours === "number")
+    parts.push(`You can train ~${hours} hours per week.`);
+  if (typeof weekly === "number")
+    parts.push(`Your current weekly distance is ~${weekly} ${units}.`);
+
+  if (raceISO) {
+    const race = new Date(raceISO);
+    const w = weeksBetween(start, race);
+    parts.push(
+      `Your race is on ${fmtDate(race)} (about ${w} weeks from ${fmtDate(
+        start
+      )}).`
+    );
+  } else if (typeof weeks === "number") {
+    const end = addWeeks(start, weeks);
+    parts.push(`You chose a ${weeks}-week plan ending around ${fmtDate(end)}.`);
+  } else if (typeof months === "number") {
+    const end = addMonths(start, months);
+    const approxWeeks = Math.round(months * 4.345);
+    parts.push(
+      `You chose a ${months}-month plan (~${approxWeeks} weeks), ending around ${fmtDate(
+        end
+      )}.`
+    );
+  }
+
+  parts.push(
+    "If you’d like to edit anything, use the back arrow to jump to that step. Otherwise, press “Looks good”."
+  );
+  return parts.join(" ");
 }
 
 export default function ChatWizardProvider({
@@ -145,452 +245,439 @@ export default function ChatWizardProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const raw = localStorage.getItem(lsMsgs);
-      if (raw) {
-        const arr = JSON.parse(raw) as ChatMessage[];
-        if (Array.isArray(arr) && arr.length) return arr;
-      }
-    } catch {
-      console.warn("read messages failed");
-    }
-    return seedBot();
-  });
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    {
+      id: uid(),
+      author: "bot",
+      text:
+        "Hi! I’m Coach Kaia — your AI running coach. " +
+        "I’ll build you a smart, adaptive plan that fits your time, fitness, and goal.",
+      ts: Date.now(),
+    },
+    {
+      id: uid(),
+      author: "bot",
+      text: "We’ll move fast and keep it simple. First things first — what’s your name?",
+      ts: Date.now() + 1,
+    },
+  ]);
 
-  const [node, setNode] = useState<Node>(() => {
-    try {
-      const raw = localStorage.getItem(lsNode) as Node | null;
-      return raw ?? "askName";
-    } catch {
-      console.warn("read node failed");
-      return "askName";
-    }
-  });
-
-  const [answers, setAnswers] = useState<Answers>(() => {
-    try {
-      const raw = localStorage.getItem(lsAns);
-      return raw ? (JSON.parse(raw) as Answers) : {};
-    } catch {
-      console.warn("read answers failed");
-      return {};
-    }
-  });
-
+  const [node, setNode] = useState<Node>("askName");
+  const [answers, setAnswers] = useState<Answers>({});
+  const [quickReplies, setQuickReplies] = useState<Reply[]>([]);
   const [isComplete, setIsComplete] = useState<boolean>(false);
-  const [input, setInput] = useState("");
-  const [quickReplies, setQuickReplies] = useState<Reply[]>(() =>
-    repliesForNode(node)
-  );
+
+  const [, setHistory] = useState<Step[]>([
+    { node: "askName", answerKeys: [] },
+  ]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(lsMsgs, JSON.stringify(messages));
-    } catch {
-      console.warn("write messages failed");
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(lsNode, node);
-    } catch {
-      console.warn("write node failed");
-    }
-  }, [node]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(lsAns, JSON.stringify(answers));
-    } catch {
-      console.warn("write answers failed");
-    }
-    try {
-      const prev = localStorage.getItem("setupAnswers");
-      const merged = prev ? { ...JSON.parse(prev), ...answers } : answers;
-      localStorage.setItem("setupAnswers", JSON.stringify(merged));
-    } catch {
-      console.warn("write setupAnswers failed");
-    }
-  }, [answers]);
-
-  const push = useCallback((m: ChatMessage | ChatMessage[]) => {
-    const arr = Array.isArray(m) ? m : [m];
-    setMessages((cur) => cur.concat(arr));
-  }, []);
+    setQuickReplies(repliesForNode(node));
+  }, [node, answers]);
 
   const ask = useCallback(
-    (n: Node, text: string) => {
-      setNode(n);
-      setQuickReplies(repliesForNode(n));
-      push({
+    (nextNode: Node, answerKeys: string[], overrides?: Partial<Answers>) => {
+      const merged = overrides ? mergeAnswers(answers, overrides) : answers;
+      const prompt = promptForNode(nextNode, merged);
+      const botMsg: ChatMessage = {
         id: uid(),
         author: "bot",
-        text,
+        text: prompt,
         ts: Date.now(),
-        kind: "prompt",
-        node: n,
-      });
+      };
+      setMessages([botMsg]);
+      setNode(nextNode);
+      setIsComplete(false);
+      setHistory((h) => [...h, { node: nextNode, answerKeys }]);
     },
-    [push]
+    [answers]
   );
 
-  const botSayText = useCallback(
-    (text: string) => {
-      push({ id: uid(), author: "bot", text, ts: Date.now(), kind: "text" });
-    },
-    [push]
-  );
-
-  const nextTargetMode = useCallback(
-    (name: string) => {
-      ask(
-        "askTargetMode",
-        `Nice to meet you, ${name}. Are you training for a set race date, a race with date TBD, or just a PR/time-trial?`
-      );
-    },
-    [ask]
-  );
-
-  const nextDistance = useCallback(() => {
-    ask("askDistance", "Great. What distance are we targeting?");
-  }, [ask]);
-
-  const nextCurrentTime = useCallback(() => {
-    ask(
-      "askCurrentTime",
-      "If you raced this distance today, what time would you run? Use HH:MM:SS or MM:SS."
-    );
-  }, [ask]);
-
-  const nextTargetTime = useCallback(() => {
-    ask(
-      "askTargetTime",
-      "What’s your goal time? You can type Skip to continue."
-    );
-  }, [ask]);
-
-  const nextRaceDateOrWindow = useCallback(
-    (mode: string) => {
-      if (mode === "race") {
-        ask("askRaceDate", "What’s the race date? Use YYYY-MM-DD.");
-      } else {
-        ask(
-          "askHorizonWeeks",
-          "What training window are you thinking, in weeks? For example: 10"
-        );
-      }
-    },
-    [ask]
-  );
-
-  const nextHours = useCallback(() => {
-    ask("askHours", "How many hours per week can you run?");
-  }, [ask]);
-
-  const nextMileage = useCallback(() => {
-    ask("askMileage", "What’s your current weekly distance? Enter a number.");
-  }, [ask]);
-
-  const nextLongest = useCallback(() => {
-    ask(
-      "askLongest",
-      "Longest continuous run in the last 4–6 weeks? You can type Skip."
-    );
-  }, [ask]);
-
-  const nextRecent5k = useCallback(() => {
-    ask("askRecent5k", "Most recent 5K time? You can type Skip.");
-  }, [ask]);
-
-  const nextConfirm = useCallback(() => {
-    const name = (answers["name"] as string) || "Runner";
-    const mode = answers["targetMode"];
-    const dist = answers["raceDistance"];
-    const cur = answers["currentFitnessTime"];
-    const goal = answers["targetTime"];
-    const date = answers["raceDate"];
-    const window = answers["goalHorizonWeeks"];
-    const hrs = answers["hours"];
-    const mi = answers["currentMileage"];
-
-    const summaryParts = [
-      `Name: ${name}`,
-      `Mode: ${mode || "-"}`,
-      `Distance: ${dist || "-"}`,
-      `Current time: ${cur || "-"}`,
-      `Goal time: ${goal || "-"}`,
-      date ? `Race date: ${date}` : window ? `Window: ${window} weeks` : "",
-      `Hours/week: ${hrs || "-"}`,
-      `Weekly distance: ${mi || "-"}`,
-    ].filter(Boolean);
-
-    botSayText("Here’s what I’ve got:");
-    botSayText(summaryParts.join(" • "));
-    ask("confirm", "Ready to continue?");
-  }, [answers, ask, botSayText]);
-
-  const persistDefaults = useCallback(() => {
-    setAnswers((a) => {
-      const next = { ...a };
-      if (!next["units"]) next["units"] = "km";
-      return next;
+  const goBackOne = useCallback(() => {
+    setHistory((h) => {
+      if (h.length <= 1) return h;
+      const prev = h[h.length - 2];
+      const trimmed = h.slice(0, h.length - 1);
+      const prevPrompt = promptForNode(prev.node, answers);
+      setMessages([
+        { id: uid(), author: "bot", text: prevPrompt, ts: Date.now() },
+      ]);
+      setNode(prev.node);
+      setIsComplete(false);
+      return trimmed;
     });
+  }, [answers]);
+
+  const reset = useCallback(() => {
+    const first: ChatMessage[] = [
+      {
+        id: uid(),
+        author: "bot",
+        text:
+          "Hi! I’m Coach Kaia — your AI running coach. " +
+          "I’ll build you a smart, adaptive plan that fits your time, fitness, and goal.",
+        ts: Date.now(),
+      },
+      {
+        id: uid(),
+        author: "bot",
+        text: "We’ll move fast and keep it simple. First things first — what’s your name?",
+        ts: Date.now() + 1,
+      },
+    ];
+    setMessages(first);
+    setNode("askName");
+    setAnswers({});
+    setIsComplete(false);
+    setHistory([{ node: "askName", answerKeys: [] }]);
   }, []);
 
-  const sendText = useCallback(
-    (raw?: string) => {
-      const text = (raw ?? "").trim() || input.trim();
-      if (!text) return;
-      const now = Date.now();
-      setMessages((cur) =>
-        cur.concat({ id: uid(), author: "user", text, ts: now, kind: "text" })
-      );
-      setInput("");
-
-      if (node === "askName") {
-        const name = text.split(/\s+/)[0];
-        setAnswers((a) => ({ ...a, name }));
-        persistDefaults();
-        nextTargetMode(name);
+  const sendOption = useCallback(
+    (value: string) => {
+      if (node === "askReason") {
+        setAnswers((a) => ({ ...a, reason: value }));
+        ask("askUnits", ["reason"]);
         return;
       }
 
-      if (node === "askTargetMode") {
-        const v = text.toLowerCase();
-        let mode = "";
-        if (v.includes("time") || v.includes("trial")) mode = "timeTrial";
-        else if (v.includes("tbd")) mode = "raceTbd";
-        else if (v.includes("race")) mode = "race";
-        if (!mode) {
-          botSayText("Please choose one of the options.");
-          return;
-        }
-        setAnswers((a) => ({ ...a, targetMode: mode }));
-        setQuickReplies([]);
-        nextDistance();
+      if (node === "askUnits") {
+        setAnswers((a) => ({ ...a, units: value }));
+        ask("askDistance", ["units"]);
         return;
       }
 
       if (node === "askDistance") {
-        const v = text.toLowerCase();
-        const map: Record<string, string> = {
-          "5k": "5k",
-          "5": "5k",
-          "10k": "10k",
-          "10": "10k",
-          half: "half",
-          marathon: "marathon",
-          ultra: "ultra",
-        };
-        const pick = map[v] || v;
-        if (!["5k", "10k", "half", "marathon", "ultra"].includes(pick)) {
-          botSayText("Please pick 5K, 10K, Half, Marathon or Ultra.");
-          return;
-        }
-        setAnswers((a) => ({ ...a, raceDistance: pick }));
-        nextCurrentTime();
-        return;
-      }
-
-      if (node === "askCurrentTime") {
-        const norm = normaliseTime(text);
-        if (!norm) {
-          botSayText("Please enter time as HH:MM:SS or MM:SS.");
-          return;
-        }
-        setAnswers((a) => ({ ...a, currentFitnessTime: norm }));
-        nextTargetTime();
-        return;
-      }
-
-      if (node === "askTargetTime") {
-        if (text.toLowerCase() !== "skip") {
-          const norm = normaliseTime(text);
-          if (!norm) {
-            botSayText("Enter HH:MM:SS, MM:SS, or type Skip.");
-            return;
-          }
-          setAnswers((a) => ({ ...a, targetTime: norm }));
-        }
-        const mode = String(answers["targetMode"] || "");
-        nextRaceDateOrWindow(mode);
+        setAnswers((a) => ({ ...a, raceDistance: value }));
+        ask("askRaceDate", ["raceDistance"]);
         return;
       }
 
       if (node === "askRaceDate") {
-        if (!isISODate(text)) {
-          botSayText("Please use YYYY-MM-DD.");
+        if (value === "noDate") {
+          setAnswers((a) => {
+            const next: Answers = { ...a };
+            delete next["raceDate"];
+            next["raceDateChoice"] = "noDate";
+            return next;
+          });
+          ask("askWindowUnit", []);
+        }
+        return;
+      }
+
+      if (node === "askWindowUnit") {
+        if (value === "weeks") {
+          setAnswers((a) => {
+            const n: Answers = { ...a };
+            delete n["goalHorizonMonths"];
+            return n;
+          });
+          ask("askHorizonWeeks", []);
           return;
         }
-        setAnswers((a) => ({ ...a, raceDate: text }));
-        nextHours();
+        if (value === "months") {
+          setAnswers((a) => {
+            const n: Answers = { ...a };
+            delete n["goalHorizonWeeks"];
+            return n;
+          });
+          ask("askHorizonMonths", []);
+          return;
+        }
+      }
+
+      if (node === "askCurrentTime") {
+        if (value === "skip") {
+          setAnswers((a) => ({ ...a, askCurrentTimeSkipped: "yes" }));
+          ask("askRecent5k", []);
+        }
+        return;
+      }
+
+      if (node === "askTargetTime") {
+        if (value === "skip") {
+          setAnswers((a) => ({ ...a, askTargetTimeSkipped: "yes" }));
+          ask("askHours", []);
+        }
+        return;
+      }
+
+      if (node === "askRecent5k") {
+        if (value === "skip") {
+          setAnswers((a) => ({ ...a, askRecent5kSkipped: "yes" }));
+          ask("askComfortablePace", []);
+        }
+        return;
+      }
+
+      if (node === "askComfortablePace") {
+        if (value === "skip") {
+          setAnswers((a) => ({ ...a, askComfortablePaceSkipped: "yes" }));
+          ask("askHours", []);
+        }
+        return;
+      }
+
+      if (node === "askLongestTime") {
+        if (value === "skip") {
+          setAnswers((a) => ({ ...a, askLongestTimeSkipped: "yes" }));
+          const lines = summaryParagraph(answers);
+          setMessages([
+            {
+              id: uid(),
+              author: "bot",
+              text: "Here’s what I’ve got:",
+              ts: Date.now(),
+            },
+            { id: uid(), author: "bot", text: lines, ts: Date.now() },
+            {
+              id: uid(),
+              author: "bot",
+              text: "Would you like us to include strength to your plan:",
+              ts: Date.now() + 1,
+            },
+          ]);
+          setNode("confirm");
+          setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
+          setIsComplete(false);
+        }
+        return;
+      }
+
+      if (node === "confirm") {
+        // Inline follow-ups for strength/mobility inside confirm chat
+        if (value === "strengthYes" || value === "strengthSkip") {
+          const v = value === "strengthYes" ? "yes" : "no";
+          setAnswers((a) => ({ ...a, includeStrength: v }));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid(),
+              author: "bot",
+              text: "Would you like us to include mobility to your plan:",
+              ts: Date.now(),
+            },
+          ]);
+          return;
+        }
+        if (value === "mobilityYes" || value === "mobilitySkip") {
+          const v = value === "mobilityYes" ? "yes" : "no";
+          setAnswers((a) => ({ ...a, includeMobility: v }));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uid(),
+              author: "bot",
+              text: "Great, we've added that. If you’d like to edit anything, use the back arrow to jump to that step. Otherwise, press “Looks good”.",
+              ts: Date.now(),
+            },
+          ]);
+          return;
+        }
+        if (value === "ok") {
+          setIsComplete(true);
+        }
+      }
+    },
+    [ask, node, answers]
+  );
+
+  const sendDate = useCallback(
+    (iso: string) => {
+      if (node !== "askRaceDate") return;
+      if (!isISODate(iso)) return;
+
+      const d = new Date(iso);
+      const t = today();
+      const max = new Date(t);
+      max.setFullYear(max.getFullYear() + 3);
+
+      if (d <= t || d > max) {
+        const prompt = promptForNode("askRaceDate", answers);
+        const hint =
+          d <= t
+            ? "Please pick a future date (YYYY-MM-DD)."
+            : "That’s a bit too far out. Try within ~3 years.";
+        setMessages([
+          { id: uid(), author: "bot", text: prompt, ts: Date.now() },
+          { id: uid(), author: "bot", text: hint, ts: Date.now() + 1 },
+        ]);
+        return;
+      }
+
+      setAnswers((a) => {
+        const next: Answers = { ...a };
+        delete next["goalHorizonWeeks"];
+        delete next["goalHorizonMonths"];
+        next["raceDate"] = iso;
+        delete next["raceDateChoice"];
+        return next;
+      });
+      ask("askCurrentTime", ["raceDate"]);
+    },
+    [ask, node, answers]
+  );
+
+  const sendText = useCallback(
+    (raw?: string) => {
+      const text = (raw ?? "").trim();
+      if (!text) return;
+
+      if (node === "askName") {
+        const first = text.split(/\s+/)[0] || "Runner";
+        setAnswers((a) => ({
+          ...a,
+          name: first,
+        }));
+        ask("askReason", ["name"], { name: first });
         return;
       }
 
       if (node === "askHorizonWeeks") {
         const n = Number(text);
-        if (!Number.isFinite(n) || n <= 0) {
-          botSayText("Enter a positive number of weeks.");
-          return;
+        if (Number.isFinite(n) && n > 0) {
+          setAnswers((a) => {
+            const next: Answers = { ...a };
+            delete next["raceDate"];
+            next["goalHorizonWeeks"] = String(Math.round(n));
+            return next;
+          });
+          ask("askCurrentTime", ["goalHorizonWeeks"]);
         }
-        setAnswers((a) => ({ ...a, goalHorizonWeeks: String(Math.round(n)) }));
-        nextHours();
+        return;
+      }
+
+      if (node === "askHorizonMonths") {
+        const n = Number(text);
+        if (Number.isFinite(n) && n > 0) {
+          setAnswers((a) => {
+            const next: Answers = { ...a };
+            delete next["raceDate"];
+            next["goalHorizonMonths"] = String(Math.round(n));
+            return next;
+          });
+          ask("askCurrentTime", ["goalHorizonMonths"]);
+        }
+        return;
+      }
+
+      if (node === "askCurrentTime") {
+        setAnswers((a) => {
+          const next: Answers = { ...a, currentFitnessTime: text };
+          delete next["askCurrentTimeSkipped"];
+          return next;
+        });
+        ask("askTargetTime", ["currentFitnessTime"]);
+        return;
+      }
+
+      if (node === "askTargetTime") {
+        setAnswers((a) => {
+          const next: Answers = { ...a, targetTime: text };
+          delete next["askTargetTimeSkipped"];
+          return next;
+        });
+        ask("askHours", ["targetTime"]);
+        return;
+      }
+
+      if (node === "askRecent5k") {
+        setAnswers((a) => {
+          const next: Answers = { ...a, recent5kTime: text };
+          delete next["askRecent5kSkipped"];
+          return next;
+        });
+        ask("askHours", ["recent5kTime"]);
+        return;
+      }
+
+      if (node === "askComfortablePace") {
+        setAnswers((a) => {
+          const next: Answers = { ...a, comfortablePace: text };
+          delete next["askComfortablePaceSkipped"];
+          return next;
+        });
+        ask("askHours", ["comfortablePace"]);
         return;
       }
 
       if (node === "askHours") {
         const n = Number(text);
-        if (!Number.isFinite(n) || n < 0) {
-          botSayText("Enter hours per week as a number.");
-          return;
+        if (Number.isFinite(n) && n >= 0) {
+          setAnswers((a) => ({ ...a, hours: Math.round(n) }));
+          ask("askMileage", ["hours"]);
         }
-        setAnswers((a) => ({ ...a, hours: Math.round(n) }));
-        nextMileage();
         return;
       }
 
       if (node === "askMileage") {
         const n = Number(text);
-        if (!Number.isFinite(n) || n < 0) {
-          botSayText("Enter a non-negative number.");
-          return;
+        if (Number.isFinite(n) && n >= 0) {
+          setAnswers((a) => ({ ...a, currentMileage: Math.round(n) }));
+          ask("askLongestTime", ["currentMileage"]);
         }
-        setAnswers((a) => ({ ...a, currentMileage: Math.round(n) }));
-        nextLongest();
         return;
       }
 
-      if (node === "askLongest") {
-        if (text.toLowerCase() !== "skip") {
-          const n = Number(text);
-          if (!Number.isFinite(n) || n < 0) {
-            botSayText("Enter a non-negative number or type Skip.");
-            return;
-          }
-          setAnswers((a) => ({ ...a, longestRun: Math.round(n) }));
-        }
-        nextRecent5k();
-        return;
-      }
-
-      if (node === "askRecent5k") {
-        if (text.toLowerCase() !== "skip") {
-          const norm = normaliseTime(text);
-          if (!norm) {
-            botSayText("Enter HH:MM:SS, MM:SS, or type Skip.");
-            return;
-          }
-          setAnswers((a) => ({ ...a, recent5kTime: norm }));
-        }
-        nextConfirm();
-        return;
-      }
-
-      if (node === "confirm") {
-        setQuickReplies([]);
-        setIsComplete(true);
-        botSayText(
-          "All set. You can review or tweak any fields on the next screen."
-        );
-        return;
-      }
-    },
-    [
-      input,
-      node,
-      answers,
-      nextTargetMode,
-      botSayText,
-      nextDistance,
-      nextCurrentTime,
-      nextTargetTime,
-      nextRaceDateOrWindow,
-      nextHours,
-      nextMileage,
-      nextLongest,
-      nextRecent5k,
-      nextConfirm,
-      persistDefaults,
-    ]
-  );
-
-  const sendOption = useCallback(
-    (value: string) => {
-      sendText(value);
-    },
-    [sendText]
-  );
-
-  const goBackOne = useCallback(() => {
-    const promptIndexes = messages
-      .map((m, i) => ({ i, m }))
-      .filter(({ m }) => m.kind === "prompt" && m.node) as Array<{
-      i: number;
-      m: ChatMessage & { node: Node; kind: "prompt" };
-    }>;
-
-    if (promptIndexes.length < 2) return;
-
-    const prevPrompt = promptIndexes[promptIndexes.length - 2];
-    const prevNode = prevPrompt.m.node;
-
-    setMessages((cur) => cur.slice(0, prevPrompt.i + 1));
-    setNode(prevNode);
-    setQuickReplies(repliesForNode(prevNode));
-    setIsComplete(false);
-
-    const cutoffIdx = nodeOrder.indexOf(prevNode);
-    if (cutoffIdx >= 0) {
-      const keysToClear = nodeOrder
-        .slice(cutoffIdx + 1)
-        .flatMap((n) => nodeAnswerKeys[n]);
-      if (keysToClear.length > 0) {
+      if (node === "askLongestTime") {
         setAnswers((a) => {
-          const next = { ...a };
-          keysToClear.forEach((k) => {
-            delete next[k];
-          });
+          const next: Answers = { ...a, longestRunTime: text };
+          delete next["askLongestTimeSkipped"];
           return next;
         });
+        const lines = summaryParagraph({ ...answers, longestRunTime: text });
+        setMessages([
+          {
+            id: uid(),
+            author: "bot",
+            text: "Here’s what I’ve got:",
+            ts: Date.now(),
+          },
+          { id: uid(), author: "bot", text: lines, ts: Date.now() },
+          {
+            id: uid(),
+            author: "bot",
+            text: "Would you like us to include strength to your plan:",
+            ts: Date.now() + 1,
+          },
+        ]);
+        setNode("confirm");
+        setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
+        setIsComplete(false);
+        return;
       }
-    }
-    setInput("");
-  }, [messages]);
-
-  const reset = useCallback(() => {
-    setMessages(seedBot());
-    setNode("askName");
-    setAnswers({});
-    setQuickReplies(repliesForNode("askName"));
-    setInput("");
-    setIsComplete(false);
-  }, []);
+    },
+    [ask, node, answers]
+  );
 
   const ctx: ChatWizardContextValue = useMemo(
     () => ({
       messages,
-      input,
-      setInput,
       quickReplies,
-      canSkip: nodeAllowsSkip(node),
-      isComplete,
+      input: "",
+      setInput: () => undefined,
       sendText,
       sendOption,
+      sendDate,
       goBackOne,
       reset,
+      isComplete,
+      startOnMonday: false,
+      toggleStartOnMonday: () => undefined,
+      node,
+      answers,
     }),
     [
       messages,
-      input,
-      node,
-      isComplete,
       quickReplies,
       sendText,
       sendOption,
+      sendDate,
       goBackOne,
       reset,
+      isComplete,
+      node,
+      answers,
     ]
   );
 
