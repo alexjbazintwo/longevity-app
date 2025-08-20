@@ -53,12 +53,11 @@ function isISODate(s: string): boolean {
 type Step = { node: Node; answerKeys: string[] };
 
 /** Merge Partial<Answers> into Answers without carrying over `undefined` values. */
-function mergeAnswers(base: Answers, delta: Partial<Answers>): Answers {
+function mergeAnswers(base: Answers, delta?: Partial<Answers>): Answers {
+  if (!delta) return base;
   const out: Answers = { ...base };
   for (const [k, v] of Object.entries(delta)) {
-    if (v !== undefined) {
-      out[k] = v as string | number;
-    }
+    if (v !== undefined) out[k] = v as string | number;
   }
   return out;
 }
@@ -71,6 +70,10 @@ function promptForNode(node: Node, answers: Answers): string {
       return "Hi! I’m Coach Kaia — your AI running coach. What’s your name?";
     case "askReason":
       return `Nice to meet you, ${name}. What brings you to Runzi today?`;
+    case "askGoalKind":
+      return "What kind of goal are we working with?";
+    case "askPrimaryOutcome":
+      return "What do you most want from your running right now?";
     case "askUnits":
       return "Which units do you prefer?";
     case "askDistance":
@@ -94,11 +97,15 @@ function promptForNode(node: Node, answers: Answers): string {
         units === "mi" ? "mile" : "km"
       }? (or Skip).`;
     case "askHours":
-      return "How many hours per week can you run?";
+      return "About how many total hours per week can you train (including any strength or mobility you plan to do)?";
     case "askMileage":
       return `What’s your current weekly distance (in ${units})? Just the number.`;
     case "askLongestTime":
       return "Longest continuous run in the last 4–6 weeks? (or Skip).";
+    case "askInjuries":
+      return "Any injuries or medical conditions we should factor in?";
+    case "askAddOns":
+      return "Would you like us to include strength or mobility to your plan?";
     case "confirm":
       return "Here’s what I’ve got:";
     default:
@@ -109,9 +116,24 @@ function promptForNode(node: Node, answers: Answers): string {
 function repliesForNode(node: Node): Reply[] {
   if (node === "askReason") {
     return [
-      { label: "Race or time goal", value: "raceOrTime" },
-      { label: "Build distance", value: "distance" },
+      { label: "Race, time or distance goal", value: "rtd" },
       { label: "Health / habit", value: "health" },
+    ];
+  }
+  if (node === "askGoalKind") {
+    return [
+      { label: "Race with a set date", value: "race" },
+      { label: "Time goal for a distance", value: "time" },
+      { label: "Build up to a distance (no race)", value: "distance" },
+    ];
+  }
+  if (node === "askPrimaryOutcome") {
+    return [
+      { label: "Consistency", value: "consistency" },
+      { label: "General fitness", value: "fitness" },
+      { label: "Weight management", value: "weight" },
+      { label: "Stress relief", value: "stress" },
+      { label: "Return to running", value: "return" },
     ];
   }
   if (node === "askUnits") {
@@ -180,10 +202,34 @@ function repliesForNode(node: Node): Reply[] {
       { label: "20", value: "20" },
     ];
   }
+  if (node === "askAddOns") {
+    return [
+      { label: "Strength", value: "addStrength" },
+      { label: "Mobility", value: "addMobility" },
+      { label: "Skip", value: "skipAddOns" },
+    ];
+  }
   if (node === "confirm") {
     return [{ label: "Looks good", value: "ok" }];
   }
   return [];
+}
+
+function labelForMedical(code: string): string {
+  switch (code) {
+    case "medical_heart":
+      return "heart/cardiac condition";
+    case "medical_hypertension":
+      return "hypertension";
+    case "medical_asthma":
+      return "asthma/respiratory condition";
+    case "medical_diabetes":
+      return "diabetes";
+    case "medical_pregnancy":
+      return "pregnant/postpartum";
+    default:
+      return code;
+  }
 }
 
 function summaryParagraph(answers: Answers): string {
@@ -201,6 +247,8 @@ function summaryParagraph(answers: Answers): string {
   const months = answers["goalHorizonMonths"]
     ? Number(answers["goalHorizonMonths"])
     : undefined;
+  const wantStrength = answers["includeStrength"] === "yes";
+  const wantMobility = answers["includeMobility"] === "yes";
 
   const start = today();
   const parts: string[] = [];
@@ -234,6 +282,38 @@ function summaryParagraph(answers: Answers): string {
     );
   }
 
+  if (wantStrength && wantMobility) {
+    parts.push("You’d like to include strength and mobility in your plan.");
+  } else if (wantStrength) {
+    parts.push("You’d like to include strength in your plan.");
+  } else if (wantMobility) {
+    parts.push("You’d like to include mobility in your plan.");
+  }
+
+  const medicalRaw = (answers["medicalConditions"] as string) || "";
+  if (medicalRaw.trim().length > 0) {
+    const meds = medicalRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map(labelForMedical);
+    if (meds.length > 0) {
+      if (answers["medicalClearance"] === "confirmed") {
+        parts.push(
+          `You reported ${meds.join(
+            ", "
+          )} and confirmed you’re cleared to exercise.`
+        );
+      } else {
+        parts.push(
+          `You reported ${meds.join(
+            ", "
+          )}. We’ll keep things conservative; consider medical clearance before intensity.`
+        );
+      }
+    }
+  }
+
   parts.push(
     "If you’d like to edit anything, use the back arrow to jump to that step. Otherwise, press “Looks good”."
   );
@@ -249,16 +329,20 @@ export default function ChatWizardProvider({
     {
       id: uid(),
       author: "bot",
-      text:
-        "Hi! I’m Coach Kaia — your AI running coach. " +
-        "I’ll build you a smart, adaptive plan that fits your time, fitness, and goal.",
+      text: "Hi! I’m Coach Kaia — your AI running coach. I’ll tune paces and recovery so you improve without burnout.",
       ts: Date.now(),
     },
     {
       id: uid(),
       author: "bot",
-      text: "We’ll move fast and keep it simple. First things first — what’s your name?",
+      text: "This takes ~2–3 minutes. You’re in control and can edit anything later.",
       ts: Date.now() + 1,
+    },
+    {
+      id: uid(),
+      author: "bot",
+      text: "What’s your name?",
+      ts: Date.now() + 2,
     },
   ]);
 
@@ -273,12 +357,22 @@ export default function ChatWizardProvider({
 
   useEffect(() => {
     setQuickReplies(repliesForNode(node));
+  }, [node]);
+
+  useEffect(() => {
+    const handle = (e: BeforeUnloadEvent) => {
+      if (node !== "askName" || Object.keys(answers).length > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handle);
+    return () => window.removeEventListener("beforeunload", handle);
   }, [node, answers]);
 
   const ask = useCallback(
     (nextNode: Node, answerKeys: string[], overrides?: Partial<Answers>) => {
-      const merged = overrides ? mergeAnswers(answers, overrides) : answers;
-      const prompt = promptForNode(nextNode, merged);
+      const prompt = promptForNode(nextNode, mergeAnswers(answers, overrides));
       const botMsg: ChatMessage = {
         id: uid(),
         author: "bot",
@@ -313,16 +407,20 @@ export default function ChatWizardProvider({
       {
         id: uid(),
         author: "bot",
-        text:
-          "Hi! I’m Coach Kaia — your AI running coach. " +
-          "I’ll build you a smart, adaptive plan that fits your time, fitness, and goal.",
+        text: "Hi! I’m Coach Kaia — your AI running coach. I’ll tune paces and recovery so you improve without burnout.",
         ts: Date.now(),
       },
       {
         id: uid(),
         author: "bot",
-        text: "We’ll move fast and keep it simple. First things first — what’s your name?",
+        text: "This takes ~2–3 minutes. You’re in control and can edit anything later.",
         ts: Date.now() + 1,
+      },
+      {
+        id: uid(),
+        author: "bot",
+        text: "What’s your name?",
+        ts: Date.now() + 2,
       },
     ];
     setMessages(first);
@@ -334,6 +432,197 @@ export default function ChatWizardProvider({
 
   const sendOption = useCallback(
     (value: string) => {
+      // Multi-select toggle for Primary Outcome + proceed
+      if (node === "askPrimaryOutcome") {
+        if (value === "primaryOutcomeProceed") {
+          ask("askWindowUnit", ["primaryOutcome"]);
+          return;
+        }
+        setAnswers((a) => {
+          const raw = (a["primaryOutcome"] as string) || "";
+          const set = new Set(
+            raw
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0)
+          );
+          if (set.has(value)) set.delete(value);
+          else set.add(value);
+          return { ...a, primaryOutcome: Array.from(set).join(",") };
+        });
+        return;
+      }
+
+      // Dedicated add-ons step
+      if (node === "askAddOns") {
+        if (value === "addStrength") {
+          setAnswers((a) => ({
+            ...a,
+            includeStrength: a.includeStrength === "yes" ? "no" : "yes",
+            addOnsSkipped:
+              a.addOnsSkipped === "yes" ? "" : (a.addOnsSkipped as string),
+          }));
+          return;
+        }
+        if (value === "addMobility") {
+          setAnswers((a) => ({
+            ...a,
+            includeMobility: a.includeMobility === "yes" ? "no" : "yes",
+            addOnsSkipped:
+              a.addOnsSkipped === "yes" ? "" : (a.addOnsSkipped as string),
+          }));
+          return;
+        }
+        if (value === "skipAddOns") {
+          const nextAnswers: Answers = { ...answers, addOnsSkipped: "yes" };
+          delete nextAnswers["includeStrength"];
+          delete nextAnswers["includeMobility"];
+          setAnswers(nextAnswers);
+
+          const lines = summaryParagraph(nextAnswers);
+          setMessages([
+            {
+              id: uid(),
+              author: "bot",
+              text: "Here’s what I’ve got:",
+              ts: Date.now(),
+            },
+            { id: uid(), author: "bot", text: lines, ts: Date.now() },
+          ]);
+          setNode("confirm");
+          setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
+          setIsComplete(false);
+          return;
+        }
+        if (value === "completeAddOns") {
+          const nextAnswers: Answers = { ...answers };
+          if (nextAnswers["addOnsSkipped"] === "yes") {
+            delete nextAnswers["addOnsSkipped"];
+          }
+          setAnswers(nextAnswers);
+
+          const lines = summaryParagraph(nextAnswers);
+          setMessages([
+            {
+              id: uid(),
+              author: "bot",
+              text: "Here’s what I’ve got:",
+              ts: Date.now(),
+            },
+            { id: uid(), author: "bot", text: lines, ts: Date.now() },
+          ]);
+          setNode("confirm");
+          setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
+          setIsComplete(false);
+          return;
+        }
+      }
+
+      // Injuries step toggles + proceed
+      if (node === "askInjuries") {
+        if (value === "injuriesDone") {
+          ask("askAddOns", []);
+          return;
+        }
+        if (value === "injury_none") {
+          setAnswers((a) => {
+            const n: Answers = { ...a, injuries: "none" };
+            return n;
+          });
+          return;
+        }
+        if (value.startsWith("injury_") || value.startsWith("medical_")) {
+          setAnswers((a) => {
+            const isMedical = value.startsWith("medical_");
+            const listKey = isMedical ? "medicalConditions" : "injuries";
+            const currentRaw = (a[listKey] as string) || "";
+            const current = new Set(
+              currentRaw
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0)
+            );
+
+            // Selecting any specific injury should clear "none"
+            if (!isMedical) {
+              const injuriesRaw = (a["injuries"] as string) || "";
+              const parts = injuriesRaw.split(",").map((s) => s.trim());
+              if (parts.includes("none")) {
+                current.delete("none");
+              }
+            } else {
+              // medical selection clears "none" from injuries list if present
+              const injuriesRaw = (a["injuries"] as string) || "";
+              const ij = new Set(
+                injuriesRaw
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter((s) => s.length > 0)
+              );
+              if (ij.has("none")) {
+                ij.delete("none");
+                a["injuries"] = Array.from(ij).join(",");
+              }
+            }
+
+            if (current.has(value)) {
+              current.delete(value);
+            } else {
+              current.add(value);
+            }
+            const updated = Array.from(current).join(",");
+
+            const n: Answers = { ...a, [listKey]: updated } as Answers;
+
+            // If no medical conditions remain, clear clearance flag
+            if (isMedical && updated.trim().length === 0) {
+              n["medicalClearance"] = "";
+            }
+            return n;
+          });
+          return;
+        }
+        if (value === "injury_other_toggle") {
+          setAnswers((a) => {
+            const raw = (a["injuries"] as string) || "";
+            const set = new Set(
+              raw
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0)
+            );
+            if (set.has("injury_other")) set.delete("injury_other");
+            else {
+              set.delete("none");
+              set.add("injury_other");
+            }
+            return { ...a, injuries: Array.from(set).join(",") };
+          });
+          return;
+        }
+        if (value === "medical_clearance_confirm") {
+          setAnswers((a) => ({
+            ...a,
+            medicalClearance:
+              a["medicalClearance"] === "confirmed" ? "" : "confirmed",
+          }));
+          return;
+        }
+      }
+
+      // Legacy inline add-ons (kept in case called elsewhere)
+      if (value === "strengthYes" || value === "strengthSkip") {
+        const v = value === "strengthYes" ? "yes" : "no";
+        setAnswers((a) => ({ ...a, includeStrength: v }));
+        return;
+      }
+      if (value === "mobilityYes" || value === "mobilitySkip") {
+        const v = value === "mobilityYes" ? "yes" : "no";
+        setAnswers((a) => ({ ...a, includeMobility: v }));
+        return;
+      }
+
+      // Reason + branching
       if (node === "askReason") {
         setAnswers((a) => ({ ...a, reason: value }));
         ask("askUnits", ["reason"]);
@@ -342,13 +631,41 @@ export default function ChatWizardProvider({
 
       if (node === "askUnits") {
         setAnswers((a) => ({ ...a, units: value }));
-        ask("askDistance", ["units"]);
+        const reason = (answers["reason"] as string) || "rtd";
+        if (reason === "health") {
+          ask("askPrimaryOutcome", ["units"]);
+        } else {
+          ask("askGoalKind", ["units"]);
+        }
+        return;
+      }
+
+      if (node === "askGoalKind") {
+        setAnswers((a) => ({ ...a, goalKind: value }));
+        ask("askDistance", ["goalKind"]);
         return;
       }
 
       if (node === "askDistance") {
         setAnswers((a) => ({ ...a, raceDistance: value }));
-        ask("askRaceDate", ["raceDistance"]);
+        const reason = (answers["reason"] as string) || "rtd";
+        const goalKind = (answers["goalKind"] as string) || "race";
+        if (reason === "health") {
+          ask("askWindowUnit", ["raceDistance"]);
+          return;
+        }
+        if (goalKind === "race") {
+          ask("askRaceDate", ["raceDistance"]);
+          return;
+        }
+        if (goalKind === "time") {
+          ask("askTargetTime", ["raceDistance"]);
+          return;
+        }
+        if (goalKind === "distance") {
+          ask("askWindowUnit", ["raceDistance"]);
+          return;
+        }
         return;
       }
 
@@ -357,6 +674,8 @@ export default function ChatWizardProvider({
           setAnswers((a) => {
             const next: Answers = { ...a };
             delete next["raceDate"];
+            delete next["goalHorizonWeeks"];
+            delete next["goalHorizonMonths"];
             next["raceDateChoice"] = "noDate";
             return next;
           });
@@ -368,7 +687,7 @@ export default function ChatWizardProvider({
       if (node === "askWindowUnit") {
         if (value === "weeks") {
           setAnswers((a) => {
-            const n: Answers = { ...a };
+            const n: Answers = { ...a, windowUnit: "weeks" };
             delete n["goalHorizonMonths"];
             return n;
           });
@@ -377,7 +696,7 @@ export default function ChatWizardProvider({
         }
         if (value === "months") {
           setAnswers((a) => {
-            const n: Answers = { ...a };
+            const n: Answers = { ...a, windowUnit: "months" };
             delete n["goalHorizonWeeks"];
             return n;
           });
@@ -386,97 +705,59 @@ export default function ChatWizardProvider({
         }
       }
 
-      if (node === "askCurrentTime") {
-        if (value === "skip") {
-          setAnswers((a) => ({ ...a, askCurrentTimeSkipped: "yes" }));
-          ask("askRecent5k", []);
-        }
+      // Skip options clear typed values
+      if (node === "askCurrentTime" && value === "skip") {
+        setAnswers((a) => {
+          const n: Answers = { ...a, askCurrentTimeSkipped: "yes" };
+          delete n["currentFitnessTime"];
+          return n;
+        });
+        ask("askRecent5k", []);
         return;
       }
 
-      if (node === "askTargetTime") {
-        if (value === "skip") {
-          setAnswers((a) => ({ ...a, askTargetTimeSkipped: "yes" }));
-          ask("askHours", []);
-        }
+      if (node === "askTargetTime" && value === "skip") {
+        setAnswers((a) => {
+          const n: Answers = { ...a, askTargetTimeSkipped: "yes" };
+          delete n["targetTime"];
+          return n;
+        });
+        ask("askHours", []);
         return;
       }
 
-      if (node === "askRecent5k") {
-        if (value === "skip") {
-          setAnswers((a) => ({ ...a, askRecent5kSkipped: "yes" }));
-          ask("askComfortablePace", []);
-        }
+      if (node === "askRecent5k" && value === "skip") {
+        setAnswers((a) => {
+          const n: Answers = { ...a, askRecent5kSkipped: "yes" };
+          delete n["recent5kTime"];
+          return n;
+        });
+        ask("askComfortablePace", []);
         return;
       }
 
-      if (node === "askComfortablePace") {
-        if (value === "skip") {
-          setAnswers((a) => ({ ...a, askComfortablePaceSkipped: "yes" }));
-          ask("askHours", []);
-        }
+      if (node === "askComfortablePace" && value === "skip") {
+        setAnswers((a) => {
+          const n: Answers = { ...a, askComfortablePaceSkipped: "yes" };
+          delete n["comfortablePace"];
+          return n;
+        });
+        ask("askHours", []);
         return;
       }
 
-      if (node === "askLongestTime") {
-        if (value === "skip") {
-          setAnswers((a) => ({ ...a, askLongestTimeSkipped: "yes" }));
-          const lines = summaryParagraph(answers);
-          setMessages([
-            {
-              id: uid(),
-              author: "bot",
-              text: "Here’s what I’ve got:",
-              ts: Date.now(),
-            },
-            { id: uid(), author: "bot", text: lines, ts: Date.now() },
-            {
-              id: uid(),
-              author: "bot",
-              text: "Would you like us to include strength to your plan:",
-              ts: Date.now() + 1,
-            },
-          ]);
-          setNode("confirm");
-          setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
-          setIsComplete(false);
-        }
+      if (node === "askLongestTime" && value === "skip") {
+        setAnswers((a) => {
+          const n: Answers = { ...a, askLongestTimeSkipped: "yes" };
+          delete n["longestRunTime"];
+          return n;
+        });
+        ask("askInjuries", []);
         return;
       }
 
-      if (node === "confirm") {
-        // Inline follow-ups for strength/mobility inside confirm chat
-        if (value === "strengthYes" || value === "strengthSkip") {
-          const v = value === "strengthYes" ? "yes" : "no";
-          setAnswers((a) => ({ ...a, includeStrength: v }));
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: uid(),
-              author: "bot",
-              text: "Would you like us to include mobility to your plan:",
-              ts: Date.now(),
-            },
-          ]);
-          return;
-        }
-        if (value === "mobilityYes" || value === "mobilitySkip") {
-          const v = value === "mobilityYes" ? "yes" : "no";
-          setAnswers((a) => ({ ...a, includeMobility: v }));
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: uid(),
-              author: "bot",
-              text: "Great, we've added that. If you’d like to edit anything, use the back arrow to jump to that step. Otherwise, press “Looks good”.",
-              ts: Date.now(),
-            },
-          ]);
-          return;
-        }
-        if (value === "ok") {
-          setIsComplete(true);
-        }
+      if (node === "confirm" && value === "ok") {
+        setIsComplete(true);
       }
     },
     [ask, node, answers]
@@ -525,10 +806,7 @@ export default function ChatWizardProvider({
 
       if (node === "askName") {
         const first = text.split(/\s+/)[0] || "Runner";
-        setAnswers((a) => ({
-          ...a,
-          name: first,
-        }));
+        setAnswers((a) => ({ ...a, name: first }));
         ask("askReason", ["name"], { name: first });
         return;
       }
@@ -542,7 +820,15 @@ export default function ChatWizardProvider({
             next["goalHorizonWeeks"] = String(Math.round(n));
             return next;
           });
-          ask("askCurrentTime", ["goalHorizonWeeks"]);
+          const reason = (answers["reason"] as string) || "rtd";
+          const goalKind = (answers["goalKind"] as string) || "race";
+          if (reason === "health") {
+            ask("askHours", ["goalHorizonWeeks"]);
+          } else if (goalKind === "distance") {
+            ask("askComfortablePace", ["goalHorizonWeeks"]);
+          } else {
+            ask("askCurrentTime", ["goalHorizonWeeks"]);
+          }
         }
         return;
       }
@@ -556,7 +842,15 @@ export default function ChatWizardProvider({
             next["goalHorizonMonths"] = String(Math.round(n));
             return next;
           });
-          ask("askCurrentTime", ["goalHorizonMonths"]);
+          const reason = (answers["reason"] as string) || "rtd";
+          const goalKind = (answers["goalKind"] as string) || "race";
+          if (reason === "health") {
+            ask("askHours", ["goalHorizonMonths"]);
+          } else if (goalKind === "distance") {
+            ask("askComfortablePace", ["goalHorizonMonths"]);
+          } else {
+            ask("askCurrentTime", ["goalHorizonMonths"]);
+          }
         }
         return;
       }
@@ -625,25 +919,16 @@ export default function ChatWizardProvider({
           delete next["askLongestTimeSkipped"];
           return next;
         });
-        const lines = summaryParagraph({ ...answers, longestRunTime: text });
-        setMessages([
-          {
-            id: uid(),
-            author: "bot",
-            text: "Here’s what I’ve got:",
-            ts: Date.now(),
-          },
-          { id: uid(), author: "bot", text: lines, ts: Date.now() },
-          {
-            id: uid(),
-            author: "bot",
-            text: "Would you like us to include strength to your plan:",
-            ts: Date.now() + 1,
-          },
-        ]);
-        setNode("confirm");
-        setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
-        setIsComplete(false);
+        ask("askInjuries", ["longestRunTime"]);
+        return;
+      }
+
+      if (node === "askAddOns") {
+        return;
+      }
+
+      if (node === "askInjuries") {
+        setAnswers((a) => ({ ...a, injuryOther: text }));
         return;
       }
     },

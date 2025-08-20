@@ -14,6 +14,8 @@ export type Reply = { label: string; value: string };
 export type Node =
   | "askName"
   | "askReason"
+  | "askGoalKind"
+  | "askPrimaryOutcome"
   | "askUnits"
   | "askDistance"
   | "askRaceDate"
@@ -27,7 +29,10 @@ export type Node =
   | "askHours"
   | "askMileage"
   | "askLongestTime"
+  | "askInjuries"
+  | "askAddOns"
   | "confirm";
+
 
 export type Answers = Record<string, string | number>;
 
