@@ -16,7 +16,6 @@ import {
 } from "@/utils";
 import { mergeDefined } from "@/utils";
 
-
 function uid(): string {
   return Math.random().toString(36).slice(2);
 }
@@ -335,6 +334,52 @@ export default function ChatWizardProvider({
     window.addEventListener("beforeunload", handle);
     return () => window.removeEventListener("beforeunload", handle);
   }, [node, answers]);
+
+  // DEV-only: /setup?demo=1 pre-fills the wizard and jumps to confirm
+  // REMOVE in production
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (!(import.meta.env.DEV && params.get("demo") === "1")) return;
+
+    const now = new Date();
+    const race = new Date(now);
+    race.setDate(race.getDate() + 77);
+
+    const seed: Partial<Answers> = {
+      name: "Alex",
+      reason: "rtd",
+      units: "km",
+      goalKind: "race",
+      raceDistance: "10k",
+      raceDate: race.toISOString().slice(0, 10),
+      currentFitnessTime: "00:50:00",
+      targetTime: "00:45:00",
+      hours: 5,
+      currentMileage: 35,
+      longestRunTime: "01:15:00",
+      includeStrength: "yes",
+      includeMobility: "yes",
+    };
+
+    setAnswers((prev) => mergeAnswers(prev, seed));
+
+    const nextAnswers = mergeAnswers({} as Answers, seed);
+    const lines = summaryParagraph(nextAnswers);
+
+    setMessages([
+      {
+        id: uid(),
+        author: "bot",
+        text: "Here’s what I’ve got:",
+        ts: Date.now(),
+      },
+      { id: uid(), author: "bot", text: lines, ts: Date.now() + 1 },
+    ]);
+    setNode("confirm");
+    setIsComplete(true);
+    setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
+  }, []);
 
   const ask = useCallback(
     (nextNode: Node, answerKeys: string[], overrides?: Partial<Answers>) => {
