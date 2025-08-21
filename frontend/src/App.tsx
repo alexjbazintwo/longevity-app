@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
-import Header from "@/components/header";
+import Header from "@/components/layout/header";
 import Home from "@/pages/home";
 import PlanSetup from "@/pages/planSetup";
-import PlanPreview from "@/pages/planPreview";
-import VerticalProvider from "@/context/VerticalProvider";
+import ChatWizardProvider from "@/context/chatWizardProvider";
 
 function Layout() {
   return (
@@ -18,16 +17,15 @@ function Layout() {
 
 export default function App() {
   return (
-    <VerticalProvider>
+    <ChatWizardProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/setup" element={<PlanSetup />} />
-            <Route path="/plan-preview" element={<PlanPreview />} />
           </Route>
         </Routes>
       </BrowserRouter>
-    </VerticalProvider>
+    </ChatWizardProvider>
   );
 }

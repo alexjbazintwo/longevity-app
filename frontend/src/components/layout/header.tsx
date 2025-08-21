@@ -11,17 +11,24 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { useVertical } from "@/hooks/useVertical";
-import type { NavItem } from "@/types/vertical";
+
+const BRAND = {
+  name: "Runzi",
+  tagline: "Adaptive running plans that fit your life",
+} as const;
+
+const NAV: ReadonlyArray<{ label: string; to: string }> = [
+  { label: "Home", to: "/" },
+  { label: "Setup", to: "/setup" },
+];
 
 export default function Header() {
-  const { pack } = useVertical();
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    document.title = `${pack.brand.name} — ${pack.brand.tagline}`;
-  }, [pack.brand.name, pack.brand.tagline, pathname]);
+    document.title = `${BRAND.name} — ${BRAND.tagline}`;
+  }, [pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -45,7 +52,7 @@ export default function Header() {
           <div className="rounded-lg p-1.5 bg-white/5 ring-1 ring-white/10">
             <img
               src="/runzi.svg?v=3"
-              alt={`${pack.brand.name} logo`}
+              alt={`${BRAND.name} logo`}
               className="h-8 w-8"
               style={{
                 filter:
@@ -57,16 +64,19 @@ export default function Header() {
           </div>
           <div className="leading-tight">
             <div className="truncate text-base font-bold tracking-tight text-white">
-              {pack.brand.name}
+              {BRAND.name}
             </div>
             <div className="truncate text-[11px] text-white/75">
-              {pack.brand.tagline}
+              {BRAND.tagline}
             </div>
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm text-white/85 lg:flex">
-          {pack.nav.map((n: NavItem) => (
+        <nav
+          className="hidden items-center gap-6 text-sm text-white/85 lg:flex"
+          aria-label="Primary"
+        >
+          {NAV.map((n) => (
             <Link key={n.label} to={n.to} className="hover:text-white">
               {n.label}
             </Link>
@@ -101,8 +111,8 @@ export default function Header() {
                 <SheetTitle className="text-left text-lg">Menu</SheetTitle>
               </SheetHeader>
               <Separator className="my-4 bg-white/10" />
-              <div className="grid gap-2">
-                {pack.nav.map((n: NavItem) => (
+              <nav className="grid gap-2" aria-label="Mobile Primary">
+                {NAV.map((n) => (
                   <Button
                     key={n.label}
                     asChild
@@ -112,7 +122,7 @@ export default function Header() {
                     <Link to={n.to}>{n.label}</Link>
                   </Button>
                 ))}
-              </div>
+              </nav>
               <Separator className="my-6 bg-white/10" />
               <Button
                 asChild
