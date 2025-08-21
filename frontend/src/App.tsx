@@ -1,8 +1,9 @@
+// src/App.tsx
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import Header from "@/components/layout/header";
 import Home from "@/pages/home";
 import PlanSetup from "@/pages/planSetup";
-import ChatWizardProvider from "@/context/chatWizardProvider";
+import PlanPreview from "@/pages/planPreview";
 
 function Layout() {
   return (
@@ -17,15 +18,14 @@ function Layout() {
 
 export default function App() {
   return (
-    <ChatWizardProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/setup" element={<PlanSetup />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ChatWizardProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/setup" element={<PlanSetup />} />
+          <Route path="/plan-preview" element={<PlanPreview />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
