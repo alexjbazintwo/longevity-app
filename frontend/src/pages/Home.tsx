@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -21,8 +15,64 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useVertical } from "@/hooks/useVertical";
-import type { Feature, Review, HeroCTA, VerticalPack } from "@/types/vertical";
+
+import { homePack } from "@/data/homePack";
+
+/** Local, strict shape for only what this page needs — using ReadonlyArray for `as const` data */
+type CTA = Readonly<{
+  label: string;
+  to: string;
+  kind: "primary" | "secondary";
+}>;
+type ProofStat = Readonly<{ value: string; label: string; note?: string }>;
+type OutcomeItem = Readonly<{ label: string; value: string }>;
+type FeatureItem = Readonly<{
+  key: string;
+  title: string;
+  text: string;
+  bullets: ReadonlyArray<string>;
+  image: string;
+  icon?: string;
+  reverse?: boolean;
+}>;
+type SmartStat = Readonly<{ icon?: string; label: string; value: string }>;
+type ReviewItem = Readonly<{ name: string; role: string; text: string }>;
+
+type SafePack = {
+  brand: { tagline: string };
+  hero: {
+    slides: ReadonlyArray<string>;
+    headline: string;
+    subhead: string;
+    ctas: ReadonlyArray<CTA>;
+    credits?: Readonly<Record<string, { href: string; label: string }>>;
+    objectPosition?: Readonly<Record<string, string>>;
+  };
+  proof?: {
+    title: string;
+    stats: ReadonlyArray<ProofStat>;
+    footnote?: string;
+  };
+  outcomes?: {
+    title: string;
+    items: ReadonlyArray<OutcomeItem>;
+  };
+  copy?: {
+    trust: { title: string; body: string };
+  };
+  trust?: { badges: ReadonlyArray<string> };
+  features?: ReadonlyArray<FeatureItem>;
+  cta?: {
+    smartAnalytics?: {
+      title: string;
+      body: string;
+      stats: ReadonlyArray<SmartStat>;
+    };
+  };
+  reviews?: ReadonlyArray<ReviewItem>;
+};
+
+const PACK: SafePack = homePack;
 
 type IconName = "HeartPulse" | "Trophy" | "Activity" | "Brain" | "LineChart";
 const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
@@ -32,48 +82,59 @@ const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
   Brain,
   LineChart,
 };
-function renderIcon(name: IconName, sizeClass: string) {
-  const Cmp = iconMap[name] ?? Activity;
+function toIconName(name?: string): IconName {
+  switch (name) {
+    case "HeartPulse":
+      return "HeartPulse";
+    case "Trophy":
+      return "Trophy";
+    case "Brain":
+      return "Brain";
+    case "LineChart":
+      return "LineChart";
+    case "Activity":
+    default:
+      return "Activity";
+  }
+}
+function renderIcon(name: string | undefined, sizeClass: string): ReactNode {
+  const Cmp = iconMap[toIconName(name)];
   return <Cmp className={sizeClass} />;
 }
 
 export default function Home() {
-  const { pack } = useVertical();
   const [activeSlide, setActiveSlide] = useState<number>(0);
   const [failed, setFailed] = useState<Record<string, boolean>>({});
 
-  const attributionBySrc: NonNullable<VerticalPack["hero"]["credits"]> =
-    pack.hero.credits ?? {};
-  const heroObjectPosition: NonNullable<
-    VerticalPack["hero"]["objectPosition"]
-  > = pack.hero.objectPosition ?? {};
+  const attributionBySrc = PACK.hero.credits ?? {};
+  const heroObjectPosition = PACK.hero.objectPosition ?? {};
 
   useEffect(() => {
     const id = setInterval(() => {
       setActiveSlide((s) => {
-        const next = (s + 1) % pack.hero.slides.length;
-        for (let i = 0; i < pack.hero.slides.length; i++) {
-          const idx = (next + i) % pack.hero.slides.length;
-          if (!failed[pack.hero.slides[idx]]) return idx;
+        const total = PACK.hero.slides.length;
+        if (total === 0) return s;
+        const next = (s + 1) % total;
+        for (let i = 0; i < total; i++) {
+          const idx = (next + i) % total;
+          const src = PACK.hero.slides[idx];
+          if (!failed[src]) return idx;
         }
         return s;
       });
     }, 6000);
     return () => clearInterval(id);
-  }, [pack.hero.slides, failed]);
+    // PACK.hero.slides is static; including it triggers the "unnecessary dependency" lint
+  }, [failed]);
 
-  const bubbles = useMemo(
-    () => pack.outcomes?.items ?? [],
-    [pack.outcomes?.items]
-  );
-  const currentSrc = pack.hero.slides[activeSlide];
+  const currentSrc = PACK.hero.slides[activeSlide] ?? "";
   const credit = attributionBySrc[currentSrc];
 
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <section className="relative isolate">
         <div className="absolute inset-0 overflow-hidden">
-          {pack.hero.slides.map((src: string, i: number) => {
+          {PACK.hero.slides.map((src, i) => {
             const hidden = failed[src];
             return (
               <motion.img
@@ -104,12 +165,12 @@ export default function Home() {
           <div className="pointer-events-none absolute left-10 bottom-0 h-72 w-72 rounded-full bg-sky-400/10 blur-[90px]" />
         </div>
 
-        {/** ↓ shorter hero + cap max height to avoid overscaling the image */}
+        {/* shorter hero + cap max height to avoid overscaling the image */}
         <div className="relative mx-auto flex w-full max-w-7xl flex-col justify-center gap-8 px-4 py-16 sm:px-8 min-h-[58vh] md:min-h-[64vh] lg:min-h-[66vh] xl:min-h-[62vh] max-h-[760px]">
           <Badge className="w-fit rounded-full bg-indigo-500/10 px-4 py-2 text-white/80 ring-1 ring-indigo-400/20 backdrop-blur">
             <span className="inline-flex items-center gap-2">
               <Cpu className="h-4 w-4" />
-              {pack.brand.tagline}
+              {PACK.brand.tagline}
             </span>
           </Badge>
 
@@ -121,16 +182,16 @@ export default function Home() {
             className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-6xl"
           >
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-cyan-200 to-emerald-300">
-              {pack.hero.headline}
+              {PACK.hero.headline}
             </span>
           </motion.h1>
 
           <p className="max-w-3xl text-base leading-relaxed text-white/85 sm:text-lg">
-            {pack.hero.subhead}
+            {PACK.hero.subhead}
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            {pack.hero.ctas.map((cta: HeroCTA) => (
+            {(PACK.hero.ctas ?? []).map((cta) => (
               <Button
                 key={cta.label}
                 asChild
@@ -149,32 +210,30 @@ export default function Home() {
             ))}
           </div>
 
-          {pack.proof && (
+          {PACK.proof && (
             <div className="mt-2 rounded-2xl border border-indigo-300/15 bg-indigo-500/10 p-4 ring-1 ring-indigo-400/10 backdrop-blur sm:p-5">
               <p className="text-xs uppercase tracking-wider text-white/85">
-                {pack.proof.title}
+                {PACK.proof.title}
               </p>
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {pack.proof.stats.map(
-                  (s: { value: string; label: string; note?: string }) => (
-                    <div
-                      key={s.label}
-                      className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10"
-                    >
-                      <div className="text-2xl font-semibold">{s.value}</div>
-                      <div className="text-sm text-white/85">{s.label}</div>
-                      {s.note && (
-                        <div className="text-[11px] text-white/75">
-                          {s.note}
-                        </div>
-                      )}
-                    </div>
-                  )
-                )}
+                {PACK.proof.stats.map((s) => (
+                  <div
+                    key={s.label}
+                    className="rounded-xl border border-indigo-300/15 bg-indigo-500/10 p-3 ring-1 ring-indigo-400/10"
+                  >
+                    <div className="text-2xl font-semibold">{s.value}</div>
+                    <div className="text-sm text-white/85">{s.label}</div>
+                    {s.note && (
+                      <div className="text-[11px] text-white/75">{s.note}</div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="mt-2 text-[11px] text-white/75">
-                {pack.proof.footnote}
-              </div>
+              {PACK.proof.footnote && (
+                <div className="mt-2 text-[11px] text-white/75">
+                  {PACK.proof.footnote}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -191,14 +250,14 @@ export default function Home() {
         )}
       </section>
 
-      {pack.outcomes && (
+      {PACK.outcomes && (
         <section className="relative">
           <div className="relative mx-auto w-full max-w-7xl px-4 py-2 sm:px-8">
             <p className="mb-4 text-xs uppercase tracking-wider text-white/75">
-              {pack.outcomes.title}
+              {PACK.outcomes.title}
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(bubbles as { label: string; value: string }[]).map((b) => (
+              {(PACK.outcomes.items ?? []).map((b) => (
                 <Card
                   key={b.label}
                   className="rounded-2xl border border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10 backdrop-blur-md"
@@ -225,14 +284,15 @@ export default function Home() {
         <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 px-4 py-12 sm:grid-cols-3 sm:px-8">
           <div className="sm:col-span-2">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {pack.copy.trust.title}
+              {PACK.copy?.trust.title ?? "Built with coaches. Tuned by data."}
             </h2>
             <p className="mt-3 max-w-2xl text-white/85">
-              {pack.copy.trust.body}
+              {PACK.copy?.trust.body ??
+                "Your plan balances stress and recovery with realistic paces and milestone checks — so you improve without burnout."}
             </p>
           </div>
           <div className="grid grid-cols-3 items-center gap-4 opacity-90">
-            {(pack.trust?.badges ?? []).map((b: string) => (
+            {(PACK.trust?.badges ?? []).map((b) => (
               <Badge
                 key={b}
                 className="rounded-xl bg-indigo-500/10 px-3 py-2 text-white ring-1 ring-indigo-400/15"
@@ -244,18 +304,18 @@ export default function Home() {
         </div>
       </section>
 
-      {pack.features && (
-        <section className="relative">
+      {PACK.features && (
+        <section id="features" className="relative">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(56,189,248,0.12),transparent_35%)]" />
           <div className="relative mx-auto w-full max-w-7xl space-y-20 px-4 py-20 sm:px-8">
-            {pack.features.map((f: Feature) => (
+            {PACK.features.map((f) => (
               <FeatureRow
                 key={f.key}
                 title={f.title}
                 text={f.text}
                 bullets={f.bullets}
                 image={f.image}
-                icon={renderIcon(f.icon as IconName, "h-6 w-6")}
+                icon={renderIcon(f.icon, "h-6 w-6")}
                 reverse={!!f.reverse}
               />
             ))}
@@ -263,16 +323,16 @@ export default function Home() {
         </section>
       )}
 
-      {pack.cta?.smartAnalytics && (
+      {PACK.cta?.smartAnalytics && (
         <section className="relative">
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(135deg,rgba(99,102,241,0.10),rgba(16,185,129,0.08))]" />
           <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 px-4 py-16 sm:grid-cols-2 sm:px-8">
             <div>
               <h3 className="text-2xl font-semibold sm:text-3xl">
-                {pack.cta.smartAnalytics.title}
+                {PACK.cta.smartAnalytics.title}
               </h3>
               <p className="mt-3 max-w-xl text-white/85">
-                {pack.cta.smartAnalytics.body}
+                {PACK.cta.smartAnalytics.body}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button
@@ -293,32 +353,27 @@ export default function Home() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {pack.cta.smartAnalytics.stats.map(
-                (
-                  s: { icon: string; label: string; value: string },
-                  i: number
-                ) => (
-                  <MiniStat
-                    key={`${s.label}-${i}`}
-                    label={s.label}
-                    value={s.value}
-                    icon={renderIcon(s.icon as IconName, "h-4 w-4")}
-                  />
-                )
-              )}
+              {PACK.cta.smartAnalytics.stats.map((s, i) => (
+                <MiniStat
+                  key={`${s.label}-${i}`}
+                  label={s.label}
+                  value={s.value}
+                  icon={renderIcon(s.icon, "h-4 w-4")}
+                />
+              ))}
             </div>
           </div>
         </section>
       )}
 
-      {pack.reviews && (
+      {PACK.reviews && (
         <section>
-          <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-8">
+          <div className="mx-auto w/full max-w-7xl px-4 py-16 sm:px-8">
             <h3 className="mb-8 text-2xl font-semibold tracking-tight sm:text-3xl">
               What runners say
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {pack.reviews.map((r: Review, i: number) => (
+              {PACK.reviews.map((r, i) => (
                 <ReviewCard
                   key={`${r.name}-${i}`}
                   name={r.name}
@@ -344,7 +399,7 @@ function FeatureRow({
 }: {
   title: string;
   text: string;
-  bullets: string[];
+  bullets: ReadonlyArray<string>;
   image: string;
   icon: ReactNode;
   reverse?: boolean;
@@ -367,7 +422,7 @@ function FeatureRow({
         </h4>
         <p className="mt-3 max-w-xl text-white/85">{text}</p>
         <ul className="mt-4 grid gap-2 text-white/85">
-          {bullets.map((b: string) => (
+          {bullets.map((b) => (
             <li key={b} className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-amber-200 via-cyan-200 to-emerald-300" />
               <span className="text-sm">{b}</span>
@@ -429,7 +484,7 @@ function ReviewCard({
     <Card className="rounded-2xl border-indigo-300/15 bg-indigo-500/10 ring-1 ring-indigo-400/10">
       <CardContent className="space-y-4 p-6">
         <div className="flex items-center gap-1">
-          {Array.from({ length: 5 }).map((_, i: number) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
           ))}
         </div>

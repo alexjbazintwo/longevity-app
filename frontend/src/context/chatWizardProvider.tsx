@@ -6,61 +6,27 @@ import ChatWizardContext, {
   type ChatWizardContextValue,
   type Answers,
 } from "@/context/chatWizardContext";
+import {
+  fmtDate,
+  today,
+  addWeeks,
+  addMonths,
+  weeksBetween,
+  isISODate,
+} from "@/utils";
+import { mergeDefined } from "@/utils";
+
 
 function uid(): string {
   return Math.random().toString(36).slice(2);
 }
 
-function fmtDate(d: Date): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-    }).format(d);
-  } catch {
-    return d.toISOString().slice(0, 10);
-  }
-}
-
-function today(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addWeeks(from: Date, w: number): Date {
-  const d = new Date(from);
-  d.setDate(d.getDate() + Math.round(w) * 7);
-  return d;
-}
-
-function addMonths(from: Date, m: number): Date {
-  const d = new Date(from);
-  d.setMonth(d.getMonth() + Math.round(m));
-  return d;
-}
-
-function weeksBetween(a: Date, b: Date): number {
-  const ms = b.getTime() - a.getTime();
-  return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24 * 7)));
-}
-
-function isISODate(s: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
-}
-
 type Step = { node: Node; answerKeys: string[] };
 
-/** Merge Partial<Answers> into Answers without carrying over `undefined` values. */
 function mergeAnswers(base: Answers, delta?: Partial<Answers>): Answers {
-  if (!delta) return base;
-  const out: Answers = { ...base };
-  for (const [k, v] of Object.entries(delta)) {
-    if (v !== undefined) out[k] = v as string | number;
-  }
-  return out;
+  return mergeDefined(base, delta);
 }
+
 
 function promptForNode(node: Node, answers: Answers): string {
   const name = (answers["name"] as string) || "";

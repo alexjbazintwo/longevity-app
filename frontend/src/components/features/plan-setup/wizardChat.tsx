@@ -1,92 +1,18 @@
+// src/components/wizard/wizardChat.tsx
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import ChatWizardContext from "@/context/chatWizardContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, RotateCw } from "lucide-react";
+import {
+  digitsToHMS,
+  digitsToMMSS,
+  formatHMSFromDigits,
+  formatMMSSFromDigits,
+  hmsCaretIndex,
+  mmssCaretIndex,
+} from "@/utils";
 
-/**
- * Masked time input helpers: progressive fill + caret lock.
- */
-function digitsToHMS(digits: string): string | null {
-  if (digits.length !== 6) return null;
-  const hh = Number(digits.slice(0, 2));
-  const mm = Number(digits.slice(2, 4));
-  const ss = Number(digits.slice(4, 6));
-  if (!Number.isFinite(hh) || !Number.isFinite(mm) || !Number.isFinite(ss))
-    return null;
-  if (mm < 0 || mm > 59 || ss < 0 || ss > 59 || hh < 0) return null;
-  return `${String(hh)}:${String(mm).padStart(2, "0")}:${String(ss).padStart(
-    2,
-    "0"
-  )}`;
-}
-function digitsToMMSS(digits: string): string | null {
-  if (digits.length !== 4) return null;
-  const mm = Number(digits.slice(0, 2));
-  const ss = Number(digits.slice(2, 4));
-  if (!Number.isFinite(mm) || !Number.isFinite(ss)) return null;
-  if (mm < 0 || mm > 59 || ss < 0 || ss > 59) return null;
-  return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
-}
-
-function maskFromDigits(digits: string, template: string): string {
-  const d = digits.replace(/\D+/g, "");
-  let i = 0;
-  let out = "";
-  for (const ch of template) {
-    if (/[HMS]/.test(ch)) {
-      out += i < d.length ? d[i++] : ch;
-    } else {
-      out += ch;
-    }
-  }
-  return out;
-}
-function formatHMSFromDigits(digits: string): string {
-  return maskFromDigits(digits, "HH:MM:SS");
-}
-function formatMMSSFromDigits(digits: string): string {
-  return maskFromDigits(digits, "MM:SS");
-}
-
-/** Next caret index for HH:MM:SS given number of typed digits (0-6). */
-function hmsCaretIndex(len: number): number {
-  switch (Math.max(0, Math.min(6, len))) {
-    case 0:
-      return 0;
-    case 1:
-      return 1;
-    case 2:
-      return 3;
-    case 3:
-      return 4;
-    case 4:
-      return 6;
-    case 5:
-      return 7;
-    default:
-      return 8;
-  }
-}
-/** Next caret index for MM:SS given number of typed digits (0-4). */
-function mmssCaretIndex(len: number): number {
-  switch (Math.max(0, Math.min(4, len))) {
-    case 0:
-      return 0;
-    case 1:
-      return 1;
-    case 2:
-      return 3;
-    case 3:
-      return 4;
-    default:
-      return 5;
-  }
-}
-
-/**
- * Progress % (logical steps based on answers).
- */
 function computeProgressPercent(
   node: string,
   answers: Record<string, string | number>
