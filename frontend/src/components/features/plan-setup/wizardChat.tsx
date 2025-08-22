@@ -1,4 +1,4 @@
-// src/components/wizard/wizardChat.tsx
+// src/components/features/plan-setup/wizardChat.tsx
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import ChatWizardContext from "@/context/chatWizardContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,17 @@ import {
   mmssCaretIndex,
 } from "@/utils";
 
+function isIntroMessage(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    t.includes("i’m coach kaia") ||
+    t.includes("i'm coach kaia") ||
+    t.includes("tune paces and recovery") ||
+    t.includes("this takes ~2–3 minutes") ||
+    t.includes("this takes ~2-3 minutes")
+  );
+}
+
 function computeProgressPercent(
   node: string,
   answers: Record<string, string | number>
@@ -21,7 +32,7 @@ function computeProgressPercent(
   const goalKind = (answers["goalKind"] as string) || "";
   const hasRaceDate = typeof answers["raceDate"] === "string";
 
-  const steps: string[] = ["askName", "askReason", "askUnits"];
+  const steps: string[] = ["askName", "askAge", "askReason", "askUnits"];
 
   if (reason === "health") {
     steps.push(
@@ -66,7 +77,13 @@ function computeProgressPercent(
     }
   }
 
-  steps.push("askInjuries", "askAddOns", "confirm");
+  steps.push(
+    "askInjuries",
+    "askSafeDistance",
+    "askSafePace",
+    "askAddOns",
+    "confirm"
+  );
 
   const mapNode = (n: string): string =>
     n === "askWindowUnit" || n === "askHorizonWeeks" || n === "askHorizonMonths"
@@ -110,14 +127,16 @@ export function WizardChat() {
     () => computeProgressPercent(ctx.node, ctx.answers),
     [ctx.node, ctx.answers]
   );
-  const progressLabel = pct < 75 ? "≈2–3 minutes" : "Almost there";
+  const filteredMessages = useMemo(
+    () => ctx.messages.filter((m) => !isIntroMessage(m.text)),
+    [ctx.messages]
+  );
 
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight });
-  }, [ctx.messages.length]);
+  }, [filteredMessages.length]);
 
   useEffect(() => {
-    // Reset per-step inputs, then hydrate from saved answers
     setSelected(null);
     setText("");
     setDateVal("");
@@ -129,6 +148,14 @@ export function WizardChat() {
     switch (ctx.node) {
       case "askName": {
         if (typeof a.name === "string") setText(a.name);
+        break;
+      }
+      case "askAge": {
+        if (typeof a.age === "number") {
+          const val = String(a.age);
+          setNumDigits(val);
+          setSelected(val);
+        }
         break;
       }
       case "askReason": {
@@ -243,12 +270,33 @@ export function WizardChat() {
         if (typeof a.injuryOther === "string") setText(a.injuryOther);
         break;
       }
+      case "askSafeDistance": {
+        if (typeof a.safeDistanceKm === "number") {
+          const val = String(a.safeDistanceKm);
+          setNumDigits(val);
+          setSelected(val);
+        }
+        break;
+      }
+      case "askSafePace": {
+        if ((a.askSafePaceSkipped as string) === "yes") setSelected("skip");
+        const sp =
+          typeof a.safePace === "string"
+            ? a.safePace
+            : typeof a.injurySafePace === "string"
+            ? (a.injurySafePace as string)
+            : "";
+        if (sp) {
+          const parts = sp.split(":");
+          if (parts.length === 2) setPaceDigits(parts[0] + parts[1]);
+        }
+        break;
+      }
       default:
         break;
     }
   }, [ctx.node, ctx.answers]);
 
-  /** keep caret fixed at the "next digit" in HH:MM:SS inputs */
   useEffect(() => {
     if (
       ctx.node === "askCurrentTime" ||
@@ -266,9 +314,8 @@ export function WizardChat() {
     }
   }, [timeDigits, ctx.node]);
 
-  /** keep caret fixed at the "next digit" in MM:SS inputs */
   useEffect(() => {
-    if (ctx.node === "askComfortablePace") {
+    if (ctx.node === "askComfortablePace" || ctx.node === "askSafePace") {
       const el = inputRef.current;
       if (el) {
         const pos = mmssCaretIndex(paceDigits.length);
@@ -283,6 +330,11 @@ export function WizardChat() {
     const n = ctx.node;
 
     if (n === "askName") return text.trim().length > 0;
+
+    if (n === "askAge") {
+      const v = Number(numDigits);
+      return Number.isFinite(v) && v > 0;
+    }
 
     if (n === "askPrimaryOutcome") {
       const raw = (ctx.answers.primaryOutcome as string) || "";
@@ -310,7 +362,13 @@ export function WizardChat() {
       return hasDate || choseLength;
     }
 
-    if (n === "askHorizonWeeks" || n === "askHorizonMonths") {
+    if (
+      n === "askHorizonWeeks" ||
+      n === "askHorizonMonths" ||
+      n === "askHours" ||
+      n === "askMileage" ||
+      n === "askSafeDistance"
+    ) {
       const v = Number(numDigits);
       return Number.isFinite(v) && v > 0;
     }
@@ -324,14 +382,9 @@ export function WizardChat() {
       return Boolean(full) || selected === "skip";
     }
 
-    if (n === "askComfortablePace") {
+    if (n === "askComfortablePace" || n === "askSafePace") {
       const full = digitsToMMSS(paceDigits);
       return Boolean(full) || selected === "skip";
-    }
-
-    if (n === "askHours" || n === "askMileage") {
-      const v = Number(numDigits);
-      return Number.isFinite(v) && v >= 0;
     }
 
     if (n === "askLongestTime") {
@@ -352,8 +405,6 @@ export function WizardChat() {
           .split(",")
           .map((s) => s.trim())
           .filter((s) => s.length > 0).length > 0;
-
-      // Proceed if they selected at least one injury or at least one medical condition.
       return hasInjuryAny || hasMedicalAny;
     }
 
@@ -410,10 +461,12 @@ export function WizardChat() {
       return;
     }
     if (
+      n === "askAge" ||
       n === "askHorizonWeeks" ||
       n === "askHorizonMonths" ||
       n === "askHours" ||
-      n === "askMileage"
+      n === "askMileage" ||
+      n === "askSafeDistance"
     ) {
       ctx.sendText(numDigits);
       return;
@@ -431,7 +484,7 @@ export function WizardChat() {
       if (full) ctx.sendText(full);
       return;
     }
-    if (n === "askComfortablePace") {
+    if (n === "askComfortablePace" || n === "askSafePace") {
       if (selected === "skip") {
         ctx.sendOption("skip");
         return;
@@ -465,7 +518,6 @@ export function WizardChat() {
     }
   }
 
-  // Quick helper accessors for injuries UI
   const injuriesRaw = ((ctx.answers.injuries as string) || "")
     .split(",")
     .map((s) => s.trim())
@@ -480,7 +532,6 @@ export function WizardChat() {
   return (
     <div className="w-full flex justify-center">
       <div className="w-full max-w-6xl px-3 sm:px-4">
-        {/* Micro-hero header */}
         <div className="relative mb-4 sm:mb-6">
           <div className="absolute -inset-x-6 -top-6 h-24 bg-gradient-to-r from-amber-300/10 via-cyan-300/10 to-emerald-300/10 blur-2xl rounded-full pointer-events-none" />
           <div className="relative z-10 flex items-center justify-between">
@@ -533,14 +584,27 @@ export function WizardChat() {
               )}
             </div>
           </div>
+
+          <div className="relative z-10 mt-4">
+            <h2 className="text-base sm:text-lg font-semibold text-white">
+              Hi! I’m Coach Kaia — your AI running coach.
+            </h2>
+            <p className="mt-1 text-sm sm:text-base text-white/85">
+              I use the latest training research to build a plan tailored to
+              you—so you get faster, stay healthy, and actually enjoy the
+              process.
+            </p>
+            <p className="mt-1 text-sm sm:text-base text-white/80">
+              This takes ~2–3 minutes. You’re in control and can edit anything
+              later.
+            </p>
+          </div>
         </div>
 
-        {/* 2-column layout: chat + right-rail preview */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-7">
             <Card className="relative overflow-hidden rounded-3xl border-indigo-300/15 bg-white/5 ring-1 ring-indigo-400/10 backdrop-blur">
               <CardContent className="p-5 sm:p-8">
-                {/* progress with label */}
                 <div className="mb-3 flex items-center gap-3">
                   <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
                     <div
@@ -548,20 +612,13 @@ export function WizardChat() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <div className="text-[11px] text-white/60 w-24 text-right">
-                    {progressLabel}
-                  </div>
-                </div>
-
-                <div className="text-center text-[12px] text-white/70">
-                  Answer a few quick questions and we’ll tune your plan.
                 </div>
 
                 <div
                   ref={scrollerRef}
                   className="mt-4 max-h-[60vh] overflow-y-auto pr-1 space-y-3"
                 >
-                  {ctx.messages.map((m) => (
+                  {filteredMessages.map((m) => (
                     <div key={m.id} className="flex justify-start">
                       <div className="rounded-2xl px-4 py-3 text-sm leading-relaxed bg-white/10 text-white">
                         {m.text}
@@ -570,14 +627,12 @@ export function WizardChat() {
                   ))}
                 </div>
 
-                {/* Injuries UI */}
                 {ctx.node === "askInjuries" && (
                   <div className="mt-4 space-y-3">
                     <div className="text-sm text-white/80">
                       Select all that apply:
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {/* None */}
                       <button
                         type="button"
                         onClick={() => ctx.sendOption("injury_none")}
@@ -591,7 +646,6 @@ export function WizardChat() {
                         None
                       </button>
 
-                      {/* Common injuries */}
                       {[
                         { code: "injury_shin", label: "Shin splints" },
                         { code: "injury_knee", label: "Knee pain" },
@@ -620,7 +674,6 @@ export function WizardChat() {
                         );
                       })}
 
-                      {/* Other */}
                       <button
                         type="button"
                         onClick={() => ctx.sendOption("injury_other_toggle")}
@@ -647,7 +700,6 @@ export function WizardChat() {
                       />
                     )}
 
-                    {/* Medical conditions */}
                     <div className="mt-2 text-sm text-white/80">
                       Any medical conditions?
                     </div>
@@ -691,7 +743,6 @@ export function WizardChat() {
                   </div>
                 )}
 
-                {/* Quick replies during flow (not on confirm / not after completion) */}
                 {ctx.quickReplies.length > 0 &&
                   ctx.node !== "confirm" &&
                   !ctx.isComplete &&
@@ -767,7 +818,10 @@ export function WizardChat() {
                               ) {
                                 if (r.value === "skip") setTimeDigits("");
                               }
-                              if (ctx.node === "askComfortablePace") {
+                              if (
+                                ctx.node === "askComfortablePace" ||
+                                ctx.node === "askSafePace"
+                              ) {
                                 if (r.value === "skip") setPaceDigits("");
                               }
                             }}
@@ -785,7 +839,6 @@ export function WizardChat() {
                     </div>
                   )}
 
-                {/* Input row */}
                 <div className="mt-5 flex items-stretch gap-2">
                   <button
                     type="button"
@@ -846,7 +899,8 @@ export function WizardChat() {
                       placeholder="HH:MM:SS"
                       className="min-w-0 flex-1 rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
                     />
-                  ) : ctx.node === "askComfortablePace" ? (
+                  ) : ctx.node === "askComfortablePace" ||
+                    ctx.node === "askSafePace" ? (
                     <input
                       ref={inputRef}
                       value={formatMMSSFromDigits(paceDigits)}
@@ -881,10 +935,12 @@ export function WizardChat() {
                       placeholder="MM:SS"
                       className="min-w-0 flex-1 rounded-xl border border-white/12 bg-slate-900/80 p-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-indigo-400/40"
                     />
-                  ) : ctx.node === "askHorizonWeeks" ||
+                  ) : ctx.node === "askAge" ||
+                    ctx.node === "askHorizonWeeks" ||
                     ctx.node === "askHorizonMonths" ||
                     ctx.node === "askHours" ||
-                    ctx.node === "askMileage" ? (
+                    ctx.node === "askMileage" ||
+                    ctx.node === "askSafeDistance" ? (
                     <input
                       value={numDigits}
                       onChange={(e) => {
@@ -943,7 +999,6 @@ export function WizardChat() {
                   </button>
                 </div>
 
-                {/* Final step quick reply (Looks good) — hide after completion */}
                 {ctx.node === "confirm" && !ctx.isComplete && (
                   <div className="mt-5 flex flex-wrap gap-2">
                     {ctx.quickReplies.map((r) => (
@@ -959,16 +1014,14 @@ export function WizardChat() {
                   </div>
                 )}
 
-                {/* Post-confirmation panel */}
                 {ctx.isComplete && (
                   <div className="mt-6 rounded-2xl border border-indigo-400/20 bg-gradient-to-br from-indigo-500/10 via-cyan-400/10 to-emerald-400/10 p-5">
                     <div className="text-lg font-semibold text-white">
                       Your AI-tuned week is nearly ready 🎉
                     </div>
                     <div className="mt-2 text-sm text-white/80">
-                      Get a week that adapts to{" "}
-                      <span className="font-medium">your</span> time, fitness,
-                      and goal — not a generic plan.
+                      Get a plan that adapts to your life and goals — nothing
+                      generic.
                     </div>
                     <ul className="mt-3 space-y-1.5 text-sm text-white/80">
                       <li>• Personalised paces for every run</li>
@@ -986,24 +1039,16 @@ export function WizardChat() {
             </Card>
           </div>
 
-          {/* Right-rail preview (blurred until completion) */}
           <div className="lg:col-span-5 hidden lg:block">
             <Card className="rounded-3xl border-indigo-300/15 bg-white/5 ring-1 ring-indigo-400/10 backdrop-blur">
               <CardContent className="p-5 sm:p-6">
                 <div className="text-sm font-semibold text-white">
-                  Your week preview {ctx.isComplete ? "" : "(locked)"}
+                  Your week preview (locked)
                 </div>
                 <div className="mt-2 text-xs text-white/70">
                   A glimpse of what we’re building for you.
                 </div>
-                <div
-                  className={[
-                    "mt-4 space-y-3 transition",
-                    ctx.isComplete
-                      ? ""
-                      : "blur-sm select-none pointer-events-none",
-                  ].join(" ")}
-                >
+                <div className="mt-4 space-y-3 transition blur-sm select-none pointer-events-none">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="text-xs text-white/70">Mon — Easy Run</div>
                     <div className="text-sm text-white">40 min • Easy</div>
@@ -1017,11 +1062,9 @@ export function WizardChat() {
                     <div className="text-sm text-white">90 min • Steady</div>
                   </div>
                 </div>
-                {!ctx.isComplete && (
-                  <div className="mt-3 text-[11px] text-white/60">
-                    Unlocks after setup — tailored paces & recovery included.
-                  </div>
-                )}
+                <div className="mt-3 text-[11px] text-white/60">
+                  Unlocks after setup — tailored paces & recovery included.
+                </div>
               </CardContent>
             </Card>
           </div>
