@@ -6,26 +6,60 @@ import ChatWizardContext, {
   type ChatWizardContextValue,
   type Answers,
 } from "@/context/chatWizardContext";
-import {
-  fmtDate,
-  today,
-  addWeeks,
-  addMonths,
-  weeksBetween,
-  isISODate,
-} from "@/utils";
-import { mergeDefined } from "@/utils";
 
 function uid(): string {
   return Math.random().toString(36).slice(2);
 }
 
+function fmtDate(d: Date): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+function today(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addWeeks(from: Date, w: number): Date {
+  const d = new Date(from);
+  d.setDate(d.getDate() + Math.round(w) * 7);
+  return d;
+}
+
+function addMonths(from: Date, m: number): Date {
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + Math.round(m));
+  return d;
+}
+
+function weeksBetween(a: Date, b: Date): number {
+  const ms = b.getTime() - a.getTime();
+  return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24 * 7)));
+}
+
+function isISODate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
+}
+
 type Step = { node: Node; answerKeys: string[] };
 
 function mergeAnswers(base: Answers, delta?: Partial<Answers>): Answers {
-  return mergeDefined(base, delta);
+  if (!delta) return base;
+  const out: Answers = { ...base };
+  for (const [k, v] of Object.entries(delta)) {
+    if (v !== undefined) out[k] = v as string | number;
+  }
+  return out;
 }
-
 
 function promptForNode(node: Node, answers: Answers): string {
   const name = (answers["name"] as string) || "";
@@ -35,6 +69,8 @@ function promptForNode(node: Node, answers: Answers): string {
       return "Hi! I’m Coach Kaia — your AI running coach. What’s your name?";
     case "askReason":
       return `Nice to meet you, ${name}. What brings you to Runzi today?`;
+    case "askAge":
+      return "How old are you?";
     case "askGoalKind":
       return "What kind of goal are we working with?";
     case "askPrimaryOutcome":
@@ -61,6 +97,12 @@ function promptForNode(node: Node, answers: Answers): string {
       return `Roughly what’s your typical easy pace per ${
         units === "mi" ? "mile" : "km"
       }? (or Skip).`;
+    case "askSafeDistance":
+      return `Injury-safe baseline: what distance can you comfortably run now without aggravation? (just the number, in ${units})`;
+    case "askSafePace":
+      return `Injury-safe baseline: what easy pace per ${
+        units === "mi" ? "mile" : "km"
+      } can you run now without aggravation? (MM:SS)`;
     case "askHours":
       return "About how many total hours per week can you train (including any strength or mobility you plan to do)?";
     case "askMileage":
@@ -214,7 +256,6 @@ function summaryParagraph(answers: Answers): string {
     : undefined;
   const wantStrength = answers["includeStrength"] === "yes";
   const wantMobility = answers["includeMobility"] === "yes";
-
   const start = today();
   const parts: string[] = [];
   parts.push(`${name}, here’s what I have so far.`);
@@ -225,7 +266,6 @@ function summaryParagraph(answers: Answers): string {
     parts.push(`You can train ~${hours} hours per week.`);
   if (typeof weekly === "number")
     parts.push(`Your current weekly distance is ~${weekly} ${units}.`);
-
   if (raceISO) {
     const race = new Date(raceISO);
     const w = weeksBetween(start, race);
@@ -246,7 +286,6 @@ function summaryParagraph(answers: Answers): string {
       )}.`
     );
   }
-
   if (wantStrength && wantMobility) {
     parts.push("You’d like to include strength and mobility in your plan.");
   } else if (wantStrength) {
@@ -254,7 +293,6 @@ function summaryParagraph(answers: Answers): string {
   } else if (wantMobility) {
     parts.push("You’d like to include mobility in your plan.");
   }
-
   const medicalRaw = (answers["medicalConditions"] as string) || "";
   if (medicalRaw.trim().length > 0) {
     const meds = medicalRaw
@@ -278,7 +316,6 @@ function summaryParagraph(answers: Answers): string {
       }
     }
   }
-
   parts.push(
     "If you’d like to edit anything, use the back arrow to jump to that step. Otherwise, press “Looks good”."
   );
@@ -315,7 +352,6 @@ export default function ChatWizardProvider({
   const [answers, setAnswers] = useState<Answers>({});
   const [quickReplies, setQuickReplies] = useState<Reply[]>([]);
   const [isComplete, setIsComplete] = useState<boolean>(false);
-
   const [, setHistory] = useState<Step[]>([
     { node: "askName", answerKeys: [] },
   ]);
@@ -334,52 +370,6 @@ export default function ChatWizardProvider({
     window.addEventListener("beforeunload", handle);
     return () => window.removeEventListener("beforeunload", handle);
   }, [node, answers]);
-
-  // DEV-only: /setup?demo=1 pre-fills the wizard and jumps to confirm
-  // REMOVE in production
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (!(import.meta.env.DEV && params.get("demo") === "1")) return;
-
-    const now = new Date();
-    const race = new Date(now);
-    race.setDate(race.getDate() + 77);
-
-    const seed: Partial<Answers> = {
-      name: "Alex",
-      reason: "rtd",
-      units: "km",
-      goalKind: "race",
-      raceDistance: "10k",
-      raceDate: race.toISOString().slice(0, 10),
-      currentFitnessTime: "00:50:00",
-      targetTime: "00:45:00",
-      hours: 5,
-      currentMileage: 35,
-      longestRunTime: "01:15:00",
-      includeStrength: "yes",
-      includeMobility: "yes",
-    };
-
-    setAnswers((prev) => mergeAnswers(prev, seed));
-
-    const nextAnswers = mergeAnswers({} as Answers, seed);
-    const lines = summaryParagraph(nextAnswers);
-
-    setMessages([
-      {
-        id: uid(),
-        author: "bot",
-        text: "Here’s what I’ve got:",
-        ts: Date.now(),
-      },
-      { id: uid(), author: "bot", text: lines, ts: Date.now() + 1 },
-    ]);
-    setNode("confirm");
-    setIsComplete(true);
-    setHistory((h) => [...h, { node: "confirm", answerKeys: [] }]);
-  }, []);
 
   const ask = useCallback(
     (nextNode: Node, answerKeys: string[], overrides?: Partial<Answers>) => {
@@ -443,10 +433,9 @@ export default function ChatWizardProvider({
 
   const sendOption = useCallback(
     (value: string) => {
-      // Multi-select toggle for Primary Outcome + proceed
       if (node === "askPrimaryOutcome") {
         if (value === "primaryOutcomeProceed") {
-          ask("askWindowUnit", ["primaryOutcome"]);
+          ask("askWindowUnit" as Node, ["primaryOutcome"]);
           return;
         }
         setAnswers((a) => {
@@ -464,7 +453,6 @@ export default function ChatWizardProvider({
         return;
       }
 
-      // Dedicated add-ons step
       if (node === "askAddOns") {
         if (value === "addStrength") {
           setAnswers((a) => ({
@@ -489,7 +477,6 @@ export default function ChatWizardProvider({
           delete nextAnswers["includeStrength"];
           delete nextAnswers["includeMobility"];
           setAnswers(nextAnswers);
-
           const lines = summaryParagraph(nextAnswers);
           setMessages([
             {
@@ -511,7 +498,6 @@ export default function ChatWizardProvider({
             delete nextAnswers["addOnsSkipped"];
           }
           setAnswers(nextAnswers);
-
           const lines = summaryParagraph(nextAnswers);
           setMessages([
             {
@@ -529,10 +515,22 @@ export default function ChatWizardProvider({
         }
       }
 
-      // Injuries step toggles + proceed
       if (node === "askInjuries") {
         if (value === "injuriesDone") {
-          ask("askAddOns", []);
+          const inj = ((answers["injuries"] as string) || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+            .filter((s) => s !== "none");
+          const meds = ((answers["medicalConditions"] as string) || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          if (inj.length > 0 || meds.length > 0) {
+            ask("askSafeDistance" as Node, []);
+          } else {
+            ask("askAddOns" as Node, []);
+          }
           return;
         }
         if (value === "injury_none") {
@@ -553,16 +551,11 @@ export default function ChatWizardProvider({
                 .map((s) => s.trim())
                 .filter((s) => s.length > 0)
             );
-
-            // Selecting any specific injury should clear "none"
             if (!isMedical) {
               const injuriesRaw = (a["injuries"] as string) || "";
               const parts = injuriesRaw.split(",").map((s) => s.trim());
-              if (parts.includes("none")) {
-                current.delete("none");
-              }
+              if (parts.includes("none")) current.delete("none");
             } else {
-              // medical selection clears "none" from injuries list if present
               const injuriesRaw = (a["injuries"] as string) || "";
               const ij = new Set(
                 injuriesRaw
@@ -575,17 +568,10 @@ export default function ChatWizardProvider({
                 a["injuries"] = Array.from(ij).join(",");
               }
             }
-
-            if (current.has(value)) {
-              current.delete(value);
-            } else {
-              current.add(value);
-            }
+            if (current.has(value)) current.delete(value);
+            else current.add(value);
             const updated = Array.from(current).join(",");
-
             const n: Answers = { ...a, [listKey]: updated } as Answers;
-
-            // If no medical conditions remain, clear clearance flag
             if (isMedical && updated.trim().length === 0) {
               n["medicalClearance"] = "";
             }
@@ -621,7 +607,6 @@ export default function ChatWizardProvider({
         }
       }
 
-      // Legacy inline add-ons (kept in case called elsewhere)
       if (value === "strengthYes" || value === "strengthSkip") {
         const v = value === "strengthYes" ? "yes" : "no";
         setAnswers((a) => ({ ...a, includeStrength: v }));
@@ -633,10 +618,9 @@ export default function ChatWizardProvider({
         return;
       }
 
-      // Reason + branching
       if (node === "askReason") {
         setAnswers((a) => ({ ...a, reason: value }));
-        ask("askUnits", ["reason"]);
+        ask("askAge" as Node, ["reason"]);
         return;
       }
 
@@ -644,16 +628,16 @@ export default function ChatWizardProvider({
         setAnswers((a) => ({ ...a, units: value }));
         const reason = (answers["reason"] as string) || "rtd";
         if (reason === "health") {
-          ask("askPrimaryOutcome", ["units"]);
+          ask("askPrimaryOutcome" as Node, ["units"]);
         } else {
-          ask("askGoalKind", ["units"]);
+          ask("askGoalKind" as Node, ["units"]);
         }
         return;
       }
 
       if (node === "askGoalKind") {
         setAnswers((a) => ({ ...a, goalKind: value }));
-        ask("askDistance", ["goalKind"]);
+        ask("askDistance" as Node, ["goalKind"]);
         return;
       }
 
@@ -662,19 +646,19 @@ export default function ChatWizardProvider({
         const reason = (answers["reason"] as string) || "rtd";
         const goalKind = (answers["goalKind"] as string) || "race";
         if (reason === "health") {
-          ask("askWindowUnit", ["raceDistance"]);
+          ask("askWindowUnit" as Node, ["raceDistance"]);
           return;
         }
         if (goalKind === "race") {
-          ask("askRaceDate", ["raceDistance"]);
+          ask("askRaceDate" as Node, ["raceDistance"]);
           return;
         }
         if (goalKind === "time") {
-          ask("askTargetTime", ["raceDistance"]);
+          ask("askTargetTime" as Node, ["raceDistance"]);
           return;
         }
         if (goalKind === "distance") {
-          ask("askWindowUnit", ["raceDistance"]);
+          ask("askWindowUnit" as Node, ["raceDistance"]);
           return;
         }
         return;
@@ -690,7 +674,7 @@ export default function ChatWizardProvider({
             next["raceDateChoice"] = "noDate";
             return next;
           });
-          ask("askWindowUnit", []);
+          ask("askWindowUnit" as Node, []);
         }
         return;
       }
@@ -702,7 +686,7 @@ export default function ChatWizardProvider({
             delete n["goalHorizonMonths"];
             return n;
           });
-          ask("askHorizonWeeks", []);
+          ask("askHorizonWeeks" as Node, []);
           return;
         }
         if (value === "months") {
@@ -711,19 +695,18 @@ export default function ChatWizardProvider({
             delete n["goalHorizonWeeks"];
             return n;
           });
-          ask("askHorizonMonths", []);
+          ask("askHorizonMonths" as Node, []);
           return;
         }
       }
 
-      // Skip options clear typed values
       if (node === "askCurrentTime" && value === "skip") {
         setAnswers((a) => {
           const n: Answers = { ...a, askCurrentTimeSkipped: "yes" };
           delete n["currentFitnessTime"];
           return n;
         });
-        ask("askRecent5k", []);
+        ask("askRecent5k" as Node, []);
         return;
       }
 
@@ -733,7 +716,7 @@ export default function ChatWizardProvider({
           delete n["targetTime"];
           return n;
         });
-        ask("askHours", []);
+        ask("askHours" as Node, []);
         return;
       }
 
@@ -743,7 +726,7 @@ export default function ChatWizardProvider({
           delete n["recent5kTime"];
           return n;
         });
-        ask("askComfortablePace", []);
+        ask("askComfortablePace" as Node, []);
         return;
       }
 
@@ -753,7 +736,7 @@ export default function ChatWizardProvider({
           delete n["comfortablePace"];
           return n;
         });
-        ask("askHours", []);
+        ask("askHours" as Node, []);
         return;
       }
 
@@ -763,7 +746,7 @@ export default function ChatWizardProvider({
           delete n["longestRunTime"];
           return n;
         });
-        ask("askInjuries", []);
+        ask("askInjuries" as Node, []);
         return;
       }
 
@@ -778,12 +761,10 @@ export default function ChatWizardProvider({
     (iso: string) => {
       if (node !== "askRaceDate") return;
       if (!isISODate(iso)) return;
-
       const d = new Date(iso);
       const t = today();
       const max = new Date(t);
       max.setFullYear(max.getFullYear() + 3);
-
       if (d <= t || d > max) {
         const prompt = promptForNode("askRaceDate", answers);
         const hint =
@@ -796,7 +777,6 @@ export default function ChatWizardProvider({
         ]);
         return;
       }
-
       setAnswers((a) => {
         const next: Answers = { ...a };
         delete next["goalHorizonWeeks"];
@@ -805,7 +785,7 @@ export default function ChatWizardProvider({
         delete next["raceDateChoice"];
         return next;
       });
-      ask("askCurrentTime", ["raceDate"]);
+      ask("askCurrentTime" as Node, ["raceDate"]);
     },
     [ask, node, answers]
   );
@@ -818,7 +798,16 @@ export default function ChatWizardProvider({
       if (node === "askName") {
         const first = text.split(/\s+/)[0] || "Runner";
         setAnswers((a) => ({ ...a, name: first }));
-        ask("askReason", ["name"], { name: first });
+        ask("askReason" as Node, ["name"], { name: first });
+        return;
+      }
+
+      if (node === "askAge") {
+        const n = Number(text);
+        if (Number.isFinite(n) && n >= 10 && n <= 100) {
+          setAnswers((a) => ({ ...a, age: Math.round(n) }));
+          ask("askUnits" as Node, ["age"]);
+        }
         return;
       }
 
@@ -834,11 +823,11 @@ export default function ChatWizardProvider({
           const reason = (answers["reason"] as string) || "rtd";
           const goalKind = (answers["goalKind"] as string) || "race";
           if (reason === "health") {
-            ask("askHours", ["goalHorizonWeeks"]);
+            ask("askHours" as Node, ["goalHorizonWeeks"]);
           } else if (goalKind === "distance") {
-            ask("askComfortablePace", ["goalHorizonWeeks"]);
+            ask("askComfortablePace" as Node, ["goalHorizonWeeks"]);
           } else {
-            ask("askCurrentTime", ["goalHorizonWeeks"]);
+            ask("askCurrentTime" as Node, ["goalHorizonWeeks"]);
           }
         }
         return;
@@ -856,11 +845,11 @@ export default function ChatWizardProvider({
           const reason = (answers["reason"] as string) || "rtd";
           const goalKind = (answers["goalKind"] as string) || "race";
           if (reason === "health") {
-            ask("askHours", ["goalHorizonMonths"]);
+            ask("askHours" as Node, ["goalHorizonMonths"]);
           } else if (goalKind === "distance") {
-            ask("askComfortablePace", ["goalHorizonMonths"]);
+            ask("askComfortablePace" as Node, ["goalHorizonMonths"]);
           } else {
-            ask("askCurrentTime", ["goalHorizonMonths"]);
+            ask("askCurrentTime" as Node, ["goalHorizonMonths"]);
           }
         }
         return;
@@ -872,7 +861,7 @@ export default function ChatWizardProvider({
           delete next["askCurrentTimeSkipped"];
           return next;
         });
-        ask("askTargetTime", ["currentFitnessTime"]);
+        ask("askTargetTime" as Node, ["currentFitnessTime"]);
         return;
       }
 
@@ -882,7 +871,7 @@ export default function ChatWizardProvider({
           delete next["askTargetTimeSkipped"];
           return next;
         });
-        ask("askHours", ["targetTime"]);
+        ask("askHours" as Node, ["targetTime"]);
         return;
       }
 
@@ -892,7 +881,7 @@ export default function ChatWizardProvider({
           delete next["askRecent5kSkipped"];
           return next;
         });
-        ask("askHours", ["recent5kTime"]);
+        ask("askHours" as Node, ["recent5kTime"]);
         return;
       }
 
@@ -902,7 +891,22 @@ export default function ChatWizardProvider({
           delete next["askComfortablePaceSkipped"];
           return next;
         });
-        ask("askHours", ["comfortablePace"]);
+        ask("askHours" as Node, ["comfortablePace"]);
+        return;
+      }
+
+      if (node === "askSafeDistance") {
+        const n = Number(text);
+        if (Number.isFinite(n) && n >= 0) {
+          setAnswers((a) => ({ ...a, safeBaselineDistance: Math.round(n) }));
+          ask("askSafePace" as Node, ["safeBaselineDistance"]);
+        }
+        return;
+      }
+
+      if (node === "askSafePace") {
+        setAnswers((a) => ({ ...a, safeBaselinePace: text }));
+        ask("askAddOns" as Node, ["safeBaselinePace"]);
         return;
       }
 
@@ -910,7 +914,7 @@ export default function ChatWizardProvider({
         const n = Number(text);
         if (Number.isFinite(n) && n >= 0) {
           setAnswers((a) => ({ ...a, hours: Math.round(n) }));
-          ask("askMileage", ["hours"]);
+          ask("askMileage" as Node, ["hours"]);
         }
         return;
       }
@@ -919,7 +923,7 @@ export default function ChatWizardProvider({
         const n = Number(text);
         if (Number.isFinite(n) && n >= 0) {
           setAnswers((a) => ({ ...a, currentMileage: Math.round(n) }));
-          ask("askLongestTime", ["currentMileage"]);
+          ask("askLongestTime" as Node, ["currentMileage"]);
         }
         return;
       }
@@ -930,7 +934,7 @@ export default function ChatWizardProvider({
           delete next["askLongestTimeSkipped"];
           return next;
         });
-        ask("askInjuries", ["longestRunTime"]);
+        ask("askInjuries" as Node, ["longestRunTime"]);
         return;
       }
 
