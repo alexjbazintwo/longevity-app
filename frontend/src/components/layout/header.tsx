@@ -37,6 +37,8 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const showCta = pathname === "/";
+
   return (
     <header
       className={[
@@ -84,16 +86,18 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button
-            asChild
-            size="sm"
-            className="hidden rounded-lg bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 px-4 py-2 text-sm text-black lg:inline-flex"
-          >
-            <Link to="/setup">
-              Start smarter training
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          {showCta && (
+            <Button
+              asChild
+              size="sm"
+              className="hidden rounded-lg bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 px-4 py-2 text-sm text-black lg:inline-flex"
+            >
+              <Link to="/setup">
+                Start smarter training
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          )}
 
           <Sheet>
             <SheetTrigger asChild>
@@ -123,13 +127,17 @@ export default function Header() {
                   </Button>
                 ))}
               </nav>
-              <Separator className="my-6 bg-white/10" />
-              <Button
-                asChild
-                className="w-full rounded-xl bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 text-black"
-              >
-                <Link to="/setup">Start smarter training</Link>
-              </Button>
+              {showCta && (
+                <>
+                  <Separator className="my-6 bg-white/10" />
+                  <Button
+                    asChild
+                    className="w-full rounded-xl bg-gradient-to-r from-amber-300 via-cyan-300 to-emerald-300 text-black"
+                  >
+                    <Link to="/setup">Start smarter training</Link>
+                  </Button>
+                </>
+              )}
             </SheetContent>
           </Sheet>
         </div>
