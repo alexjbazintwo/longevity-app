@@ -1,2 +1,4 @@
 # backend/.gitignore
 .env
+
+/generated/prisma

@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model User {
+  // Keep existing text/cuid IDs for users to avoid auth breakage
+  id    String @id @default(cuid())
+  email String @unique
+  name  String?
+
+  plans Plan[]
+}
+
+model Plan {
+  // Switch to UUID for plan IDs
+  id       String @id @default(uuid()) @db.Uuid
+
+  // Link to User (User.id remains text)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+
+  goal      String
+  startDate DateTime
+  targetDate DateTime?
+
+  // Minutes-only schema
+  currentWeeklyRunningMinutes Int
+  longestRecentRunMinutes     Int
+  weeklyMinutesMax            Int
+  runsPerWeek                 Int
+
+  includeMobility Boolean
+  includeStrength Boolean
+
+  // Constraints & options
+  constraints   Json?
+  weekAnchorDay Int?    // 0=Sun..6=Sat (backend defaults to 1=Mon if null)
+
+  injuries     Json?
+  medicalFlags Json?
+
+  weeks Week[]
+}
+
+model Week {
+  id        String  @id @default(uuid()) @db.Uuid
+  planId    String  @db.Uuid
+  plan      Plan    @relation(fields: [planId], references: [id])
+
+  weekIndex   Int
+  phase       String   // "prep" | "build" | "recovery"
+  startDate   DateTime
+  rampPercent Float
+
+  intensityMix Json
+  rationale    Json?
+
+  workouts Workout[]
+}
+
+model Workout {
+  id     String @id @default(uuid()) @db.Uuid
+  weekId String @db.Uuid
+  week   Week   @relation(fields: [weekId], references: [id])
+
+  type        String   // "run" | "mobility" | "strength"
+  date        DateTime
+  durationMin Int
+
+  // Split intensity taxonomy
+  role        String?  // "Easy" | "Long" | "Quality"
+  focusZone   String?  // "Z1".."Z5"
+  sessionType String?  // "Tempo" | "Threshold" | "Intervals" | "Progression"
+
+  structure Json?
+  notes     String?
+}
+
+model ActivityLog {
+  // Switch to UUID for activity log IDs (userId remains text)
+  id     String @id @default(uuid()) @db.Uuid
+  userId String
+
+  date        DateTime
+  type        String   // "run" | "mobility" | "strength"
+  durationMin Int
+  distanceKm  Float?
+  rpe         Int?
+  avgHr       Int?
+  notes       String?
+  source      String   // "manual" | "strava" | "csv"
+
+  @@index([userId, date])
+}
